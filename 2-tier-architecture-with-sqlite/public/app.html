@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cloud CIDR Calculator</title>
+    <style>
+        /* Global Variables & Theme */
+        :root {
+            --bg: #f4f4f5; --card-bg: white; --text: #334155; --border: #cbd5e1; 
+            --primary: #2563eb; --primary-hover: #1d4ed8; --input-border: #cbd5e1;
+        }
+        body.dark-mode {
+            --bg: #0f172a; --card-bg: #1e293b; --text: #e2e8f0; --border: #475569; 
+            --primary: #3b82f6; --primary-hover: #2563eb; --input-border: #475569;
+        }
+
+        body { font-family: system-ui; background: var(--bg); color: var(--text); margin: 0; padding: 20px; transition: background 0.3s; }
+        .container { max-width: 950px; margin: auto; background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        /* Global Navbar Styles */
+        .nav-bar { display: flex; justify-content: space-between; border-bottom: 2px solid var(--border); padding-bottom: 15px; margin-bottom: 25px; align-items: center; }
+        .nav-links a { color: var(--text); text-decoration: none; margin-right: 20px; font-weight: bold; padding: 6px 12px; border-radius: 4px; display: inline-block;}
+        .nav-links a.active { background: var(--primary); color: white; }
+        .nav-links a:hover:not(.active) { background: var(--primary-hover); color: white; }
+        .theme-toggle { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+
+        /* Calculator Specific Styles */
+        .button-group { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; align-items: center; }
+        button.calc-btn { padding: 10px 15px; cursor: pointer; border: 2px solid var(--primary); background: var(--card-bg); color: var(--primary); border-radius: 6px; font-weight: 500; transition: all 0.2s; }
+        button.calc-btn:hover { background: var(--primary-hover); color: white; }
+        button.calc-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 6px rgba(37,99,235,0.3); transform: translateY(-1px); }
+        
+        input[type="number"], input[type="text"] { padding: 10px; border: 2px solid var(--input-border); border-radius: 6px; font-size: 14px; background: var(--card-bg); color: var(--text); outline: none; }
+        input[type="number"]:focus, input[type="text"]:focus { border-color: var(--primary); }
+        #custom-mask { width: 180px; }
+        #custom-vpc { width: 180px; }
+
+        .results { background: var(--bg); padding: 20px; border-radius: 6px; margin-top: 20px; border: 1px solid var(--border); }
+        .grid-layout { display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; }
+        
+        .tooltip { position: relative; display: inline-block; border-bottom: 1px dotted var(--text); cursor: help; font-weight: bold; }
+        .tooltip .tooltiptext {
+            visibility: hidden; width: 220px; background-color: #1e293b; color: #fff; text-align: center;
+            border-radius: 6px; padding: 8px; position: absolute; z-index: 1; bottom: 125%; left: 50%;
+            margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-weight: normal; font-size: 13px;
+        }
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        
+        /* UPDATED: History Panel & Buttons */
+        .history-panel { margin-top: 30px; border-top: 2px solid var(--border); padding-top: 20px; }
+        #history-list { margin: 0; padding: 0; }
+        #history-list li { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--border); list-style-type: none; transition: background 0.2s; border-radius: 4px; }
+        #history-list li:hover { background: var(--bg); border-left: 4px solid var(--primary); padding-left: 8px; }
+        
+        .btn-restore { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s;}
+        .btn-restore:hover { opacity: 0.9; }
+        .manage-del-btn { background: transparent; border: none; color: #ef4444; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s;}
+        .manage-del-btn:hover { transform: scale(1.1); }
+
+        .subnet-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px; max-height: 350px; overflow-y: auto; }
+        .subnet-list li { padding: 8px 0; border-bottom: 1px solid var(--border); list-style-type: none; font-size: 14px; }
+        .subnet-list li:last-child { border-bottom: none; }
+        .subnet-list ul { margin: 0; padding: 0; }
+        .subnet-range { color: #64748b; display: block; margin-top: 4px; font-family: monospace; font-size: 13px; }
+        .subnet-count { color: #059669; font-weight: bold; font-size: 12px; background: #d1fae5; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+    </style>
+    <script src="navbar.js"></script>
+</head>
+<body>
+    <div class="container" style="margin-top: 80px;">
+        
+        <h3>1. Select or Enter VPC Base IP Range (/16)</h3>
+        <div class="button-group" id="vpc-buttons">
+            <button class="calc-btn" id="vpc-10" onclick="setVPC('10.0.0.0', 'vpc-10')">10.0.0.0</button>
+            <button class="calc-btn" id="vpc-172" onclick="setVPC('172.16.0.0', 'vpc-172')">172.16.0.0</button>
+            <button class="calc-btn" id="vpc-192" onclick="setVPC('192.168.0.0', 'vpc-192')">192.168.0.0</button>
+            <span style="color: var(--border);">|</span>
+            <input type="text" id="custom-vpc" placeholder="Custom (e.g. 10.1.0.0)" oninput="setCustomVPC(this.value)">
+        </div>
+
+        <h3>2. Select or Enter Subnet Mask</h3>
+        <div class="button-group" id="subnet-buttons">
+            <button class="calc-btn" id="mask-20" onclick="setSubnet(20, 'mask-20')">/20</button>
+            <button class="calc-btn" id="mask-22" onclick="setSubnet(22, 'mask-22')">/22</button>
+            <button class="calc-btn" id="mask-24" onclick="setSubnet(24, 'mask-24')">/24</button>
+            <button class="calc-btn" id="mask-28" onclick="setSubnet(28, 'mask-28')">/28</button>
+            <span style="color: var(--border);">|</span>
+            <input type="number" id="custom-mask" placeholder="Custom (0-32)" min="0" max="32" oninput="setCustomMask(this.value)">
+        </div>
+
+        <div class="results" id="output" style="display:none;">
+            <div class="grid-layout">
+                <div>
+                    <h3 style="margin-top: 0;">IP Math</h3>
+                    <p><strong>Formula:</strong> 2^(32 - <span id="out-mask"></span>) = <strong><span id="out-total"></span> Total IPs</strong></p>
+                    <p><strong>Usable IPs:</strong> <span id="out-total-2"></span> - 5 reserved = <strong><span id="out-usable" style="color: var(--primary);"></span></strong></p>
+                    
+                    <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+                    
+                    <h4 style="margin-bottom: 10px;">Cloud Reserved IPs (First Subnet)</h4>
+                    <ul style="line-height: 1.6; margin-top: 0; padding-left: 20px;">
+                        <li><span class="tooltip">Network<span class="tooltiptext">The first IP. Used to identify the network itself.</span></span>: <span id="res-1"></span></li>
+                        <li><span class="tooltip">VPC Router<span class="tooltiptext">The second IP. Reserved by the cloud provider for the default gateway.</span></span>: <span id="res-2"></span></li>
+                        <li><span class="tooltip">DNS Server<span class="tooltiptext">The third IP. Reserved for mapping domain names to IPs.</span></span>: <span id="res-3"></span></li>
+                        <li><span class="tooltip">Future Use<span class="tooltiptext">The fourth IP. Reserved by the cloud provider for future feature rollouts.</span></span>: <span id="res-4"></span></li>
+                        <li><span class="tooltip">Broadcast<span class="tooltiptext">The last IP. Reserved to comply with RFC standards.</span></span>: <span id="res-5"></span></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 style="margin-top: 0;">Complete Subnet List</h3>
+                    <p style="font-size: 14px; margin-top: -10px;">A /16 VPC carved into /<span id="sub-mask-display"></span> subnets creates <strong><span id="total-subnets-count"></span> total subnets.</strong></p>
+                    <div class="subnet-list" id="subnets-list">
+                        </div>
+                </div>
+            </div>
+
+            <button onclick="saveCalculation()" style="background: #16a34a; color:white; border:none; margin-top:20px; padding: 12px 24px; border-radius: 6px; font-weight: bold; width: 100%; cursor:pointer;">Save Architecture to History</button>
+        </div>
+
+        <div class="history-panel">
+            <h3>Your Saved Architectures</h3>
+            <ul id="history-list" style="line-height: 1.8;"></ul>
+        </div>
+    </div>
+
+    <script>
+        let currentVPC = '';
+        let currentMask = null;
+        const vpcMask = 16;
+
+        const user = localStorage.getItem('cidr_user');
+        if(!user) window.location.href = '/';
+
+        function setVPC(ip, btnId) {
+            currentVPC = ip;
+            document.querySelectorAll('#vpc-buttons button').forEach(b => b.classList.remove('active'));
+            document.getElementById('custom-vpc').value = '';
+            if (btnId) document.getElementById(btnId).classList.add('active');
+            calculate();
+        }
+
+        function setCustomVPC(ip) {
+            if (/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) {
+                currentVPC = ip;
+                document.querySelectorAll('#vpc-buttons button').forEach(b => b.classList.remove('active'));
+                calculate();
+            }
+        }
+
+        function setSubnet(mask, btnId) {
+            currentMask = parseInt(mask);
+            document.querySelectorAll('#subnet-buttons button').forEach(b => b.classList.remove('active'));
+            document.getElementById('custom-mask').value = ''; 
+            if (btnId) document.getElementById(btnId).classList.add('active');
+            calculate();
+        }
+
+        function setCustomMask(value) {
+            const mask = parseInt(value);
+            if (!isNaN(mask) && mask >= 0 && mask <= 32) {
+                currentMask = mask;
+                document.querySelectorAll('#subnet-buttons button').forEach(b => b.classList.remove('active'));
+                calculate();
+            }
+        }
+
+        function ipToInt(ip) {
+            return ip.split('.').reduce((int, octet) => (int << 8) + parseInt(octet, 10), 0) >>> 0;
+        }
+        function intToIp(int) {
+            return [(int >>> 24) & 255, (int >>> 16) & 255, (int >>> 8) & 255, int & 255].join('.');
+        }
+
+        function calculate() {
+            if(!currentVPC || currentMask === null || currentMask < 0 || currentMask > 32) return;
+            document.getElementById('output').style.display = 'block';
+            
+            const totalIPs = Math.pow(2, 32 - currentMask);
+            const usableIPs = totalIPs > 5 ? totalIPs - 5 : 0;
+            
+            document.getElementById('out-mask').innerText = currentMask;
+            document.getElementById('out-total').innerText = totalIPs.toLocaleString();
+            document.getElementById('out-total-2').innerText = totalIPs.toLocaleString();
+            document.getElementById('out-usable').innerText = usableIPs.toLocaleString();
+
+            const baseInt = ipToInt(currentVPC);
+            
+            if (totalIPs >= 5) {
+                document.getElementById('res-1').innerText = intToIp(baseInt);
+                document.getElementById('res-2').innerText = intToIp(baseInt + 1);
+                document.getElementById('res-3').innerText = intToIp(baseInt + 2);
+                document.getElementById('res-4').innerText = intToIp(baseInt + 3);
+                document.getElementById('res-5').innerText = intToIp(baseInt + totalIPs - 1);
+            } else {
+                document.getElementById('res-1').innerText = intToIp(baseInt);
+                document.getElementById('res-2').innerText = totalIPs > 1 ? intToIp(baseInt + 1) : "N/A";
+                document.getElementById('res-3').innerText = "N/A";
+                document.getElementById('res-4').innerText = "N/A";
+                document.getElementById('res-5').innerText = "N/A";
+            }
+
+            document.getElementById('sub-mask-display').innerText = currentMask;
+            
+            const subnetListContainer = document.getElementById('subnets-list');
+            if (currentMask < vpcMask) {
+                document.getElementById('total-subnets-count').innerText = 0;
+                subnetListContainer.innerHTML = `<div style="padding: 15px; color: #991b1b; background: #fee2e2; border-radius: 4px; font-size: 14px;"><b>⚠️ Invalid Architecture:</b> You cannot carve a /${currentMask} subnet out of a smaller /${vpcMask} VPC.<br><br>The subnet mask number must be equal to or greater than the VPC mask number.</div>`;
+                return;
+            }
+
+            const totalSubnets = Math.pow(2, currentMask - vpcMask);
+            document.getElementById('total-subnets-count').innerText = totalSubnets.toLocaleString();
+
+            let subnetsHTML = '';
+            
+            if (currentMask > 28) {
+                subnetsHTML += `<div style="padding: 12px; margin-bottom: 12px; color: #854d0e; background: #fef08a; border-radius: 4px; font-size: 14px;"><b>⚠️ AWS Limit Warning:</b> AWS restricts minimum subnet sizes to /28 (16 IPs). Creating a /${currentMask} subnet is technically valid in networking, but AWS will reject it.</div>`;
+            }
+
+            const renderLimit = 500;
+            const subnetsToRender = Math.min(totalSubnets, renderLimit);
+            
+            subnetsHTML += '<ul>';
+            
+            for(let i = 0; i < subnetsToRender; i++) {
+                let subnetStartInt = baseInt + (i * totalIPs);
+                let subnetEndInt = subnetStartInt + totalIPs - 1; 
+                let startIP = intToIp(subnetStartInt);
+                let endIP = intToIp(subnetEndInt);
+
+                subnetsHTML += `
+                    <li>
+                        <strong>Subnet ${i+1}:</strong> ${startIP}/${currentMask} 
+                        <span class="subnet-count">${totalIPs.toLocaleString()} IPs</span>
+                        <span class="subnet-range">Range: ${startIP} ➔ ${endIP}</span>
+                    </li>`;
+            }
+            
+            if (totalSubnets > renderLimit) {
+                const remaining = (totalSubnets - renderLimit).toLocaleString();
+                subnetsHTML += `<li style="text-align:center; color:#64748b; font-style:italic; padding-top: 15px;">... and ${remaining} more subnets hidden to prevent your browser from crashing.</li>`;
+            }
+            
+            subnetsHTML += '</ul>';
+            subnetListContainer.innerHTML = subnetsHTML;
+        }
+
+        async function saveCalculation() {
+            await fetch('/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    username: user, 
+                    vpc_cidr: `${currentVPC}/16`, 
+                    subnet_cidr: `/${currentMask}` 
+                })
+            });
+            loadHistory();
+            
+            const btn = document.querySelector('button[onclick="saveCalculation()"]');
+            const originalText = btn.innerText;
+            btn.innerText = "Saved!";
+            btn.style.background = "#15803d";
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.background = "#16a34a";
+            }, 2000);
+        }
+
+        function restoreState(vpcStr, maskStr) {
+            const vpcIp = vpcStr.split('/')[0];
+            const maskNum = parseInt(maskStr.replace('/', ''));
+            
+            document.getElementById('custom-vpc').value = vpcIp;
+            document.getElementById('custom-mask').value = maskNum;
+            
+            setCustomVPC(vpcIp);
+            setCustomMask(maskNum);
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // NEW: Delete specific history by database ID
+        async function deleteHistory(id) {
+            if (confirm("Are you sure you want to permanently delete this saved architecture?")) {
+                try {
+                    await fetch(`/api/history/${id}`, { method: 'DELETE' });
+                    loadHistory(); // Refresh the list after successful deletion
+                } catch (err) {
+                    console.error("Failed to delete history", err);
+                }
+            }
+        }
+
+        // UPDATED: Now generates explicit 'Restore' and 'Delete' buttons
+        async function loadHistory() {
+            try {
+                const res = await fetch(`/api/history/${user}`);
+                const data = await res.json();
+                const list = document.getElementById('history-list');
+                
+                if (data.length === 0) {
+                    list.innerHTML = "<li style='justify-content:center; color:#64748b;'>No saved architectures yet.</li>";
+                    return;
+                }
+
+                list.innerHTML = data.map(row => 
+                    `<li>
+                        <div>
+                            <strong>VPC:</strong> ${row.vpc_cidr} ➔ <strong>Subnets:</strong> ${row.subnet_cidr} 
+                            <span style="color: #64748b; font-size: 13px; margin-left: 10px;">(Saved: ${new Date(row.timestamp).toLocaleString()})</span>
+                        </div>
+                        <div>
+                            <button class="btn-restore" onclick="restoreState('${row.vpc_cidr}', '${row.subnet_cidr}')">Restore</button>
+                            <button class="manage-del-btn" style="margin-left:10px;" title="Delete" onclick="deleteHistory(${row.id})">🗑️</button>
+                        </div>
+                    </li>`
+                ).join('');
+            } catch (err) {
+                console.error("Failed to load history", err);
+            }
+        }
+
+        loadHistory();
+    </script>
+</body>
+</html>

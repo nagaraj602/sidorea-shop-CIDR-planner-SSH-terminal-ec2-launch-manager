@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidorea Login</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <style>
+        body { font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f4f5; margin: 0; }
+        .card { background: white; padding: 2.5rem 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 300px; }
+        .login-logo { height: 80px; margin-bottom: 15px; object-fit: contain; }
+        h2 { margin-top: 0; color: #334155; }
+        input { padding: 10px; margin: 15px 0; width: 90%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 12px 20px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; width: 90%; font-weight: bold; font-size: 15px; }
+        button:hover { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="/logo.png" alt="Sidorea Logo" class="login-logo">
+        <h2>Welcome Back</h2>
+        <input type="text" id="username" placeholder="Enter Username" required>
+        <button onclick="login()">Go to Dashboard</button>
+    </div>
+    
+    <script>
+        function login() {
+            // FIXED: Automatically convert username to lowercase and trim spaces
+            const user = document.getElementById('username').value.trim().toLowerCase();
+            if(user) {
+                localStorage.setItem('cidr_user', user);
+                // FIXED: Removed .html from URL
+                window.location.href = '/app';
+            }
+        }
+        
+        document.getElementById('username').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') login();
+        });
+    </script>
+</body>
+</html>

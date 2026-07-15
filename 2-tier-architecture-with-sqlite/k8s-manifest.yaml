@@ -1,0 +1,85 @@
+---
+# 1. Headless Service (Required for StatefulSets)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-headless
+  labels:
+    app: sidorea-app
+spec:
+  clusterIP: None # This makes it "headless"
+  selector:
+    app: sidorea-app
+  ports:
+    - port: 80
+      targetPort: 80
+
+---
+# 2. NodePort Service (To access the app via browser)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-public
+  labels:
+    app: sidorea-app
+spec:
+  type: NodePort
+  selector:
+    app: sidorea-app
+  ports:
+    - port: 80
+      targetPort: 80
+      # nodePort: 30080 # Optional: You can force a specific port between 30000-32767
+
+---
+# 3. StatefulSet Configuration
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sidorea-app
+spec:
+  serviceName: "sidorea-headless"
+  replicas: 1 # Must be 1 when using SQLite to avoid file-locking conflicts
+  selector:
+    matchLabels:
+      app: sidorea-app
+  template:
+    metadata:
+      labels:
+        app: sidorea-app
+    spec:
+      containers:
+        - name: sidorea-container
+          image: nagarajkamath602/sidorea-app:latest # Replace with your image
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          
+          # Health Probes pointing to the new /health endpoint
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            
+          volumeMounts:
+            - name: sidorea-storage
+              mountPath: /app/data # Mounts to a /data folder in the container
+
+  # Automatically provisions persistent storage for SQLite and Keys
+  volumeClaimTemplates:
+    - metadata:
+        name: sidorea-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 2Gi

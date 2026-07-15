@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Web SSH Terminals</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <style>
+        :root { --bg: #f4f4f5; --card-bg: white; --text: #334155; --border: #cbd5e1; --primary: #2563eb; }
+        body.dark-mode { --bg: #0f172a; --card-bg: #1e293b; --text: #e2e8f0; --border: #475569; --primary: #3b82f6; }
+        body { font-family: system-ui; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 98%; margin: auto; background: var(--card-bg); padding: 20px; border-radius: 8px; box-sizing: border-box;}
+        
+        .control-panel { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; background: var(--bg); padding: 15px; border-radius: 6px; border: 1px solid var(--border); align-items: flex-end;}
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        input, select { padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--card-bg); color: var(--text); font-size: 14px;}
+        
+        .btn { padding: 10px 15px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s;}
+        .btn:hover { opacity: 0.9; }
+        .btn-restore { background: #10b981; }
+        .btn-reset { background: #ef4444; }
+        .btn-manage { background: #8b5cf6; }
+        .btn-aws { background: #f59e0b; color: #000; }
+
+        @keyframes button-blink { 0%, 100% { background-color: #10b981; transform: scale(1); box-shadow: none; color: white;} 50% { background-color: #f59e0b; box-shadow: 0 0 15px 5px rgba(245, 158, 11, 0.8); transform: scale(1.08); color: black; } }
+        .blink-btn { animation: button-blink 0.7s ease-in-out 1s 6 !important; transition: none !important; }
+        .error-box { display: none; background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #fca5a5; font-weight: bold;}
+
+        /* Layout Configurations */
+        .workspace { display: flex; gap: 20px; height: 95vh; width: 100%; box-sizing: border-box;}
+        .workspace.horizontal { overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; align-items: stretch; padding-bottom: 15px; scroll-behavior: smooth; }
+        .workspace.horizontal .terminal-wrapper { flex: 0 0 1200px; max-width: 95vw; box-sizing: border-box; }
+        .workspace.split { flex-wrap: nowrap; overflow: hidden; justify-content: flex-start; }
+        .workspace.split .terminal-wrapper { flex: 0 0 calc(50% - 10px); box-sizing: border-box; } 
+        
+        .terminal-wrapper { background: #0b0f19; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; border: 1px solid #1e293b; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); transition: transform 0.2s ease-in-out;}
+        .terminal-header { color: #fff; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-family: monospace; border-bottom: 1px solid #334155; padding-bottom: 8px; font-size: 14px; font-weight: bold;}
+        .terminal-container { flex-grow: 1; width: 100%; position: relative; overflow: hidden; }
+
+        .power-bar { background: #1e293b; border-top: 1px solid #334155; padding: 10px; margin-top: 10px; border-radius: 0 0 8px 8px; display: flex; justify-content: space-between; align-items: center;}
+        .pwr-btn { background: transparent; border: 1px solid #64748b; color: #cbd5e1; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: 0.2s; }
+        .pwr-btn:hover { background: #334155; color: white; }
+        .pwr-btn.start { border-color: #10b981; color: #10b981; } .pwr-btn.start:hover { background: #10b981; color: white; }
+        .pwr-btn.stop { border-color: #f59e0b; color: #f59e0b; } .pwr-btn.stop:hover { background: #f59e0b; color: white; }
+        .pwr-btn.term { border-color: #ef4444; color: #ef4444; } .pwr-btn.term:hover { background: #ef4444; color: white; }
+
+        .term-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; cursor: pointer; font-size: 12px; margin-left: 5px; padding: 4px 8px; border-radius: 4px; transition: 0.2s; font-family: system-ui; }
+        .term-btn:hover { color: white; border-color: #cbd5e1; background: #334155; }
+        
+        .inline-edit-name { background: transparent; border: 1px solid transparent; color: #38bdf8; font-size: 15px; font-weight: bold; font-family: monospace; padding: 2px 6px; border-radius: 4px; outline: none; width: 250px; transition: 0.2s; }
+        .inline-edit-name:focus, .inline-edit-name:hover { border-color: #38bdf8; background: #0f172a; }
+        .inline-edit-conn { background: transparent; border: 1px dashed transparent; color: #94a3b8; font-size: 13px; font-family: monospace; padding: 2px 4px; border-radius: 4px; outline: none; transition: 0.2s; }
+        .inline-edit-conn:focus, .inline-edit-conn:hover { border-color: #64748b; background: #1e293b; color: white; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-box { background: var(--card-bg); padding: 25px; border-radius: 8px; min-width: 550px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .modal-box h3 { margin-top: 0; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        
+        .manage-section { margin-bottom: 20px; }
+        .manage-list { list-style: none; padding: 0; margin: 10px 0; max-height: 150px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; }
+        .manage-list li { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+        .manage-list li:last-child { border-bottom: none; }
+        .manage-del-btn { background: transparent; border: none; color: #ef4444; cursor: pointer; font-weight: bold; }
+        .manage-del-btn:hover { text-decoration: underline; }
+        .form-label { font-size: 12px; font-weight: bold; color: #64748b; margin-top: 5px; }
+
+        /* Styles for disabled form fields to indicate locked state */
+        select:disabled, input:disabled { background-color: var(--bg); cursor: not-allowed; opacity: 0.7; }
+    </style>
+    <script src="/navbar.js"></script>
+</head>
+<body>
+    <div class="container" style="margin-top: 80px;">
+        <div style="margin-bottom: 20px;">
+            <h2 style="margin-bottom: 5px; color: var(--primary);">SSH Terminal Workspace</h2>
+            <p style="color: #64748b; font-size: 14px; margin-top: 0; line-height: 1.6; max-width: 2000px;">
+                <strong>Welcome to your command center.</strong> Connect to multiple servers simultaneously and monitor live resource usage (CPU, RAM, Disk) directly in the title bar. Use the <strong>Upload (📤)</strong> and <strong>Download (📥)</strong> buttons for quick SFTP file transfers. You can reorder terminals using the arrows, or use <strong>Horizontal Scroll</strong> to infinitely add full-sized terminals side-by-side without them ever getting squished. You can also compare specific tabs using <strong>Split View</strong>, and save your entire layout to <strong>Session History</strong> to instantly restore it later.
+            </p>
+        </div>
+        
+        <div class="error-box" id="error-msg"></div>
+
+        <div class="control-panel">
+            <div class="form-group"><label>Terminal Name</label><input type="text" id="ssh-name" placeholder="e.g. Prod Server"></div>
+            <div class="form-group"><label>Target IP</label><input list="ssh-hosts-list" id="ssh-host" placeholder="172.31.45.10"><datalist id="ssh-hosts-list"></datalist></div>
+            <div class="form-group"><label>Username</label><input list="ssh-users-list" id="ssh-user" placeholder="ubuntu"><datalist id="ssh-users-list"></datalist></div>
+            
+            <div class="form-group">
+                <label>Saved Private Key</label>
+                <div style="display: flex; gap: 5px;">
+                    <select id="ssh-key-dropdown" style="flex: 1;"><option value="">Loading keys...</option></select>
+                    <button class="btn" style="padding: 6px 12px; font-size: 12px; background: #10b981;" onclick="document.getElementById('key-upload-input').click()">📤 Upload</button>
+                    <input type="file" id="key-upload-input" style="display:none;" onchange="uploadNewKey(this)" accept=".pem,.ppk,.key">
+                </div>
+            </div>
+
+            <div class="form-group"><button class="btn" onclick="createTerminal()">+ Open Terminal</button></div>
+            
+            <div style="margin-left: auto; display: flex; gap: 10px;">
+                <button class="btn btn-aws" onclick="openAwsModal()">🔑 AWS Credentials</button>
+                <button class="btn btn-aws" onclick="openProvisionModal()" style="background:#2563eb; color:white;">🚀 Launch New EC2</button>
+            </div>
+        </div>
+
+        <div class="control-panel" style="background: transparent; border: none; padding: 0; justify-content: space-between;">
+            <div>
+                <button class="btn" onclick="setLayout('horizontal')">↔️ Horizontal Scroll</button>
+                <button class="btn" onclick="requestSplitLayout()">🪟 Selective Split View</button>
+                <button class="btn btn-reset" onclick="resetActiveWorkspace()">🗑️ Clear All Terminals</button>
+            </div>
+            <div style="display:flex; gap: 10px;">
+                <button class="btn btn-restore blink-btn" onclick="openHistoryModal()">📂 Session History</button>
+                <button class="btn btn-restore" onclick="quickSaveSession()">💾 Save Layout</button>
+                <button class="btn btn-manage" onclick="openManageModal()">⚙️ Manage Data</button>
+            </div>
+        </div>
+
+        <div class="workspace horizontal" id="workspace"></div>
+    </div>
+
+    <div class="modal-overlay" id="provision-modal">
+        <div class="modal-box">
+            <h3>🚀 Provision New EC2 Instance</h3>
+            <div id="provision-status" style="display:none; padding:10px; margin-bottom:10px; background:#dbeafe; color:#1e40af; border-radius:4px; font-weight:bold;">Initializing...</div>
+            
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;" id="provision-form">
+                
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex:2; display:flex; flex-direction:column;">
+                        <span class="form-label" style="display:flex; justify-content:space-between;">
+                            AWS Credential
+                            <a href="#" onclick="openAwsModal()" style="color:var(--primary); text-decoration:none;">+ Add New</a>
+                        </span>
+                        <select id="prov-cred" onchange="handleCredSelectionChange()"><option value="">Loading Credentials...</option></select>
+                    </div>
+                    <div style="flex:1; display:flex; flex-direction:column;">
+                        <span class="form-label">Region</span>
+                        <select id="prov-region" onchange="syncAwsRegionData()" disabled>
+                            <option value="us-east-1">us-east-1 (N. Virginia)</option>
+                            <option value="us-east-2">us-east-2 (Ohio)</option>
+                            <option value="us-west-1">us-west-1 (N. California)</option>
+                            <option value="us-west-2">us-west-2 (Oregon)</option>
+                            <option value="af-south-1">af-south-1 (Cape Town)</option>
+                            <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+                            <option value="ap-northeast-2">ap-northeast-2 (Seoul)</option>
+                            <option value="ap-northeast-3">ap-northeast-3 (Osaka)</option>
+                            <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+                            <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+                            <option value="ap-southeast-2">ap-southeast-2 (Sydney)</option>
+                            <option value="ca-central-1">ca-central-1 (Central)</option>
+                            <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+                            <option value="eu-north-1">eu-north-1 (Stockholm)</option>
+                            <option value="eu-south-1">eu-south-1 (Milan)</option>
+                            <option value="eu-west-1">eu-west-1 (Ireland)</option>
+                            <option value="eu-west-2">eu-west-2 (London)</option>
+                            <option value="eu-west-3">eu-west-3 (Paris)</option>
+                            <option value="me-south-1">me-south-1 (Bahrain)</option>
+                            <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <span class="form-label">Operating System / AMI Selection</span>
+                    <select id="prov-os" onchange="toggleOsContext()" disabled>
+                        <option value="ubuntu26">Ubuntu 26.04 LTS (Latest)</option>
+                        <option value="ubuntu24">Ubuntu 24.04 LTS</option>
+                        <option value="ubuntu22">Ubuntu 22.04 LTS</option>
+                        <option value="rhel10">Red Hat Enterprise Linux 10</option>
+                        <option value="rhel9">Red Hat Enterprise Linux 9</option>
+                        <option value="amazon2023">Amazon Linux 2023</option>
+                        <option value="my-ami">My AMIs (Fetched from your account)</option>
+                        <option value="custom">Custom AMI ID (Marketplace / Raw input)</option>
+                    </select>
+                </div>
+
+                <div id="my-ami-container" style="display:none; flex-direction:column;">
+                    <span class="form-label">Choose from Your AMIs</span>
+                    <select id="prov-my-amis" disabled><option value="">⚠️ Select AWS Credential Above</option></select>
+                </div>
+
+                <div id="custom-ami-container" style="display:none; flex-direction:column;">
+                    <span class="form-label">Enter Custom AMI ID</span>
+                    <input type="text" id="prov-ami-raw" placeholder="ami-0abcdef1234567890" disabled>
+                </div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <span class="form-label">Instance Type Configuration</span>
+                    <select id="prov-type" onchange="toggleCustomInstanceType()" disabled>
+                        <optgroup label="Free Tier Eligible">
+                            <option value="t2.micro">t2.micro (1 vCPU, 1 GiB RAM)</option>
+                            <option value="t3.micro">t3.micro (2 vCPU, 1 GiB RAM)</option>
+                        </optgroup>
+                        <optgroup label="General Purpose Balanced">
+                            <option value="t3.small">t3.small (2 vCPU, 2 GiB RAM)</option>
+                            <option value="t3.medium">t3.medium (2 vCPU, 4 GiB RAM)</option>
+                            <option value="t3.large">t3.large (2 vCPU, 8 GiB RAM)</option>
+                        </optgroup>
+                        <optgroup label="Compute / Production Heavy">
+                            <option value="c5.large">c5.large (2 vCPU, 4 GiB RAM)</option>
+                            <option value="c5a.large">c5a.large (2 vCPU, 4 GiB RAM)</option>
+                        </optgroup>
+                        <optgroup label="Memory Optimized">
+                            <option value="r5.large">r5.large (2 vCPU, 16 GiB RAM)</option>
+                        </optgroup>
+                        <option value="custom">Other / Enter Custom Instance Type...</option>
+                    </select>
+                    <input type="text" id="prov-type-custom" placeholder="e.g. c6i.2xlarge" style="display:none; margin-top:5px;" disabled>
+                </div>
+
+                <div style="display:flex; flex-direction:column;">
+                    <span class="form-label">Security Group Configuration</span>
+                    <select id="prov-sg-mode" onchange="toggleSgFields()" disabled>
+                        <option value="existing">Use Existing Security Group from Default VPC</option>
+                        <option value="create-default">Auto-Create New: Open All Ports</option>
+                        <option value="create-custom">Auto-Create New: Specify Custom Ports</option>
+                    </select>
+                    
+                    <div style="font-size:11px; color:#f59e0b; margin-top:3px; font-weight:500;">
+                        ⚠️ Note: Only Security Groups inside the **Default VPC** are listed. This app is structured for basic EC2 launches and excludes non-default or custom VPC isolation patterns.
+                    </div>
+                </div>
+
+                <div id="existing-sg-container" style="display:flex; flex-direction:column;">
+                    <select id="prov-existing-sgs" disabled><option value="">⚠️ Select AWS Credential Above</option></select>
+                </div>
+
+                <div id="custom-sg-fields" style="display:none; gap: 10px; background: var(--bg); padding: 10px; border: 1px solid var(--border); border-radius: 4px; margin-top:5px;">
+                    <select id="prov-sg-proto" style="flex:1;" disabled><option value="tcp">TCP</option><option value="udp">UDP</option></select>
+                    <input type="text" id="prov-sg-ports" placeholder="Ports (e.g. 80, 443, 8080)" style="flex:3;" disabled>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div style="display:flex; align-items:center; flex:1; gap:5px; background:var(--card-bg); border: 1px solid var(--border); border-radius: 4px; padding-left: 10px;">
+                        <span style="font-size:12px; font-weight:bold; color:#64748b; white-space: nowrap;">Storage (GB):</span>
+                        <input type="number" id="prov-storage" value="8" min="8" max="1000" style="border:none; outline:none; flex:1; padding-left: 5px;" disabled>
+                    </div>
+                    <div style="display: flex; flex:2; align-items: center; gap: 5px;">
+                        <span style="font-size:12px; font-weight:bold; color:#64748b; white-space:nowrap;">Key Pair:</span>
+                        <select id="prov-aws-key" style="flex:1;" disabled><option value="">⚠️ Select AWS Credential Above</option></select>
+                    </div>
+                </div>
+                
+                <button id="prov-launch-btn" class="btn btn-restore" onclick="executeProvision()" style="margin-top:10px; cursor:not-allowed; opacity:0.5;" disabled>Launch instance</button>
+            </div>
+            
+            <div style="text-align: right;">
+                <button id="prov-cancel-btn" class="btn btn-reset" onclick="closeModal('provision-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="aws-modal">
+        <div class="modal-box">
+            <h3>🔑 Add Global AWS Credentials</h3>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px; background:var(--bg); padding:15px; border-radius:6px; border:1px solid var(--border);">
+                <input type="text" id="aws-alias" placeholder="Alias (e.g. Production Account)">
+                <input type="text" id="aws-key" placeholder="Access Key ID">
+                <input type="password" id="aws-secret" placeholder="Secret Access Key">
+                <button class="btn" onclick="saveAwsCreds()">Save Credential</button>
+            </div>
+            <div style="text-align: right;"><button class="btn btn-reset" onclick="closeModal('aws-modal')">Close</button></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="manage-modal">
+        <div class="modal-box">
+            <h3>⚙️ Manage Saved Data</h3>
+            <div class="manage-section">
+                <div><strong>AWS Credentials</strong></div>
+                <ul class="manage-list" id="manage-aws-list"></ul>
+            </div>
+            <div class="manage-section">
+                <div style="display: flex; justify-content: space-between;"><strong>Saved IPs / Hosts</strong><button class="manage-del-btn" onclick="clearAllData('hosts')">Clear All</button></div>
+                <ul class="manage-list" id="manage-hosts-list"></ul>
+            </div>
+            <div class="manage-section">
+                <div style="display: flex; justify-content: space-between;"><strong>Saved Usernames</strong><button class="manage-del-btn" onclick="clearAllData('users')">Clear Custom</button></div>
+                <ul class="manage-list" id="manage-users-list"></ul>
+            </div>
+            <div class="manage-section">
+                <div style="display: flex; justify-content: space-between;"><strong>Saved Private Keys</strong><button class="manage-del-btn" onclick="clearAllData('keys')">Clear All</button></div>
+                <ul class="manage-list" id="manage-keys-list"></ul>
+            </div>
+            <div style="text-align: right;"><button class="btn" onclick="closeModal('manage-modal')">Done</button></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal-box">
+            <h3>📂 Saved Session History</h3>
+            <ul class="manage-list" id="history-list" style="max-height: 300px;"></ul>
+            <div style="text-align: right; margin-top: 15px;"><button class="btn btn-reset" onclick="closeModal('history-modal')">Close</button></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="split-modal">
+        <div class="modal-box">
+            <h3>🪟 Select 2 Terminals to Split</h3>
+            <div id="split-options" style="margin: 20px 0; max-height: 300px; overflow-y: auto;"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-reset" onclick="closeModal('split-modal')">Cancel</button>
+                <button class="btn" onclick="applySplitSelection()">Apply Split View</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+        window.addEventListener('load', () => { window.scrollTo(0, 0); });
+        const user = localStorage.getItem('cidr_user'); if(!user) window.location.href = '/';
+
+        let activeSessions = []; let currentLayout = 'horizontal'; let serverKeys = []; let awsCreds = []; let savedSgs = [];
+        const defaultUsers = ['ubuntu', 'ec2-user']; let knownUsernames = [...defaultUsers]; let knownHosts = []; let sessionHistory = []; 
+
+        const awsRegionOptions = `
+            <option value="us-east-1">us-east-1 (N. Virginia)</option>
+            <option value="us-east-2">us-east-2 (Ohio)</option>
+            <option value="us-west-1">us-west-1 (N. California)</option>
+            <option value="us-west-2">us-west-2 (Oregon)</option>
+            <option value="af-south-1">af-south-1 (Cape Town)</option>
+            <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+            <option value="ap-northeast-2">ap-northeast-2 (Seoul)</option>
+            <option value="ap-northeast-3">ap-northeast-3 (Osaka)</option>
+            <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+            <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+            <option value="ap-southeast-2">ap-southeast-2 (Sydney)</option>
+            <option value="ca-central-1">ca-central-1 (Central)</option>
+            <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+            <option value="eu-north-1">eu-north-1 (Stockholm)</option>
+            <option value="eu-south-1">eu-south-1 (Milan)</option>
+            <option value="eu-west-1">eu-west-1 (Ireland)</option>
+            <option value="eu-west-2">eu-west-2 (London)</option>
+            <option value="eu-west-3">eu-west-3 (Paris)</option>
+            <option value="me-south-1">me-south-1 (Bahrain)</option>
+            <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+        `;
+
+        async function initData() {
+            try {
+                const res = await fetch(`/api/ssh-data/${user}`); const data = await res.json();
+                knownHosts = data.hosts || []; sessionHistory = data.history || []; knownUsernames = [...new Set([...defaultUsers, ...(data.usernames || [])])];
+                document.getElementById('ssh-users-list').innerHTML = knownUsernames.map(u => `<option value="${u}">`).join('');
+                document.getElementById('ssh-hosts-list').innerHTML = knownHosts.map(h => `<option value="${h}">`).join('');
+                await loadKeys(); await loadAwsCreds(); await loadAwsSgs();
+
+                const localWorkspace = localStorage.getItem('cidr_workspace_' + user);
+                if (localWorkspace) {
+                    const savedSessions = JSON.parse(localWorkspace);
+                    if (savedSessions && savedSessions.length > 0) {
+                        savedSessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name));
+                        setLayout('horizontal');
+                    }
+                    localStorage.removeItem('cidr_workspace_' + user);
+                } 
+                else if (sessionHistory.length > 0 && activeSessions.length === 0) {
+                    const targetSession = sessionHistory[0];
+                    if (targetSession.sessions && targetSession.sessions.length > 0) {
+                        targetSession.sessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name));
+                        setLayout('horizontal');
+                    }
+                }
+
+            } catch (err) {}
+        }
+
+        async function quickSaveSession() {
+            if(activeSessions.length === 0) return alert("No active terminals to save.");
+            const name = prompt("Enter a name for this session layout:", `Session ${new Date().toLocaleTimeString()}`);
+            if (!name) return; 
+            
+            const safeState = activeSessions.map(s => { return { host: document.getElementById(`edit-host-${s.id}`).value.trim(), user: document.getElementById(`edit-user-${s.id}`).value.trim(), name: document.getElementById(`edit-name-${s.id}`).value.trim(), keyPath: s.keyPath }; });
+            sessionHistory.unshift({ name, date: new Date().toLocaleString(), sessions: safeState });
+            if (sessionHistory.length > 20) sessionHistory = sessionHistory.slice(0, 20); 
+            
+            await syncToServer(); 
+            alert("✅ Layout saved successfully! You can find it in the Session History folder.");
+        }
+
+        async function uploadNewKey(input) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const keyName = prompt("Enter a memorable name for this private key (e.g., App-Prod-Key):", file.name);
+            
+            if (!keyName) {
+                input.value = ''; 
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('username', user);
+            formData.append('keyName', keyName);
+            formData.append('privateKey', file);
+
+            try {
+                const res = await fetch('/api/upload-key', { method: 'POST', body: formData });
+                if (res.ok) {
+                    alert("✅ Key securely saved to your local database!");
+                    await loadKeys(); 
+                } else {
+                    alert("❌ Failed to upload key: " + await res.text());
+                }
+            } catch (err) {
+                alert("❌ Upload error.");
+            }
+            input.value = ''; 
+        }
+        
+        async function loadAwsCreds() {
+            const res = await fetch(`/api/aws-creds/${user}`); awsCreds = await res.json();
+            
+            // FIXED: Explicitly use the string the user set (No AWS Credentials) so it renders perfectly
+            const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
+            document.getElementById('prov-cred').innerHTML = awsCreds.length ? `<option value="">Select Credential...</option>` + credOptions : '<option value="">No AWS Credentials - Click "+ Add New"</option>';
+            
+            document.querySelectorAll('select[id^="power-cred-"]').forEach(select => {
+                const currentVal = select.value;
+                select.innerHTML = credOptions;
+                if (currentVal && awsCreds.find(c => c.id == currentVal)) {
+                    select.value = currentVal;
+                }
+            });
+
+            handleCredSelectionChange();
+        }
+
+        function handleCredSelectionChange() {
+            const credId = document.getElementById('prov-cred').value;
+            const isEnabled = !!credId;
+            
+            const fieldsToToggle = ['prov-region', 'prov-os', 'prov-my-amis', 'prov-ami-raw', 'prov-type', 'prov-type-custom', 'prov-sg-mode', 'prov-existing-sgs', 'prov-sg-proto', 'prov-sg-ports', 'prov-storage', 'prov-aws-key'];
+            
+            fieldsToToggle.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.disabled = !isEnabled;
+            });
+
+            const launchBtn = document.getElementById('prov-launch-btn');
+            if (launchBtn) {
+                launchBtn.disabled = !isEnabled;
+                launchBtn.style.opacity = isEnabled ? '1' : '0.5';
+                launchBtn.style.cursor = isEnabled ? 'pointer' : 'not-allowed';
+            }
+
+            if (isEnabled) {
+                syncAwsRegionData();
+            } else {
+                document.getElementById('prov-aws-key').innerHTML = '<option value="">⚠️ Select AWS Credential Above</option>';
+                document.getElementById('prov-existing-sgs').innerHTML = '<option value="">⚠️ Select AWS Credential Above</option>';
+                document.getElementById('prov-my-amis').innerHTML = '<option value="">⚠️ Select AWS Credential Above</option>';
+            }
+        }
+
+        async function loadAwsSgs() {
+            const res = await fetch(`/api/aws-sgs/${user}`); savedSgs = await res.json();
+            updateSgDropdown();
+        }
+
+        function updateSgDropdown() {
+            const credId = document.getElementById('prov-cred').value;
+            const region = document.getElementById('prov-region').value;
+            const filtered = savedSgs.filter(s => s.cred_id == credId && s.region === region);
+            document.getElementById('saved-sgs-list').innerHTML = filtered.map(s => `<option value="${s.sg_id}">${s.sg_name}</option>`).join('');
+        }
+
+        async function syncAwsRegionData() {
+            const credId = document.getElementById('prov-cred').value;
+            const region = document.getElementById('prov-region').value;
+            
+            if (!credId || !region) {
+                document.getElementById('prov-aws-key').innerHTML = '<option value="">⚠️ Select AWS Credential Above</option>';
+                document.getElementById('prov-existing-sgs').innerHTML = '<option value="">⚠️ Select AWS Credential Above</option>';
+                document.getElementById('prov-my-amis').innerHTML = '<option value="">⚠️ Select AWS Credential Above</option>';
+                return;
+            }
+
+            document.getElementById('prov-aws-key').innerHTML = '<option>Syncing keys...</option>';
+            document.getElementById('prov-existing-sgs').innerHTML = '<option>Syncing Default SGs...</option>';
+            document.getElementById('prov-my-amis').innerHTML = '<option>Syncing My AMIs...</option>';
+
+            try {
+                const res = await fetch(`/api/aws-region-data?username=${user}&credId=${credId}&region=${region}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    document.getElementById('prov-aws-key').innerHTML = data.keyPairs.length ? 
+                        data.keyPairs.map(k => `<option value="${k}">${k}</option>`).join('') : '<option value="">No keys found in this region</option>';
+                    
+                    document.getElementById('prov-existing-sgs').innerHTML = data.securityGroups.length ? 
+                        data.securityGroups.map(sg => `<option value="${sg.id}">${sg.name} (${sg.id})</option>`).join('') : '<option value="">No Default VPC groups found</option>';
+                    
+                    document.getElementById('prov-my-amis').innerHTML = data.customAmis.length ? 
+                        data.customAmis.map(img => `<option value="${img.id}">${img.name} (${img.id})</option>`).join('') : '<option value="">No custom AMIs found in this region</option>';
+                } else {
+                    const failText = '<option value="">Sync failed</option>';
+                    document.getElementById('prov-aws-key').innerHTML = failText;
+                    document.getElementById('prov-existing-sgs').innerHTML = failText;
+                    document.getElementById('prov-my-amis').innerHTML = failText;
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        function toggleOsContext() {
+            const val = document.getElementById('prov-os').value;
+            document.getElementById('my-ami-container').style.display = (val === 'my-ami') ? 'flex' : 'none';
+            document.getElementById('custom-ami-container').style.display = (val === 'custom') ? 'flex' : 'none';
+        }
+
+        function toggleCustomInstanceType() {
+            document.getElementById('prov-type-custom').style.display = (document.getElementById('prov-type').value === 'custom') ? 'block' : 'none';
+        }
+
+        function toggleSgFields() {
+            const mode = document.getElementById('prov-sg-mode').value;
+            document.getElementById('existing-sg-container').style.display = (mode === 'existing') ? 'flex' : 'none';
+            document.getElementById('custom-sg-fields').style.display = (mode === 'create-custom') ? 'flex' : 'none';
+        }
+
+        function openProvisionModal() {
+            handleCredSelectionChange();
+
+            document.getElementById('provision-form').style.display = 'flex';
+            document.getElementById('provision-status').style.display = 'none';
+            
+            const cancelBtn = document.getElementById('prov-cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.innerText = 'Cancel';
+                cancelBtn.classList.remove('btn-restore');
+                cancelBtn.classList.add('btn-reset');
+                cancelBtn.style.display = 'inline-block';
+            }
+
+            document.getElementById('provision-modal').style.display = 'flex';
+        }
+
+        async function executeProvision() {
+            const credId = document.getElementById('prov-cred').value; 
+            const region = document.getElementById('prov-region').value;
+            const osType = document.getElementById('prov-os').value;
+            
+            let customAmi = "";
+            if (osType === 'my-ami') customAmi = document.getElementById('prov-my-amis').value;
+            if (osType === 'custom') customAmi = document.getElementById('prov-ami-raw').value;
+            
+            if((osType === 'my-ami' || osType === 'custom') && !customAmi) {
+                return alert("Please pick or type a functional AMI identity.");
+            }
+
+            let instanceType = document.getElementById('prov-type').value;
+            if (instanceType === 'custom') {
+                instanceType = document.getElementById('prov-type-custom').value;
+                if (!instanceType) return alert("Specify custom target model code.");
+            }
+            
+            const awsKeyName = document.getElementById('prov-aws-key').value;
+            const storageSize = document.getElementById('prov-storage').value;
+            
+            const sgSelectionType = document.getElementById('prov-sg-mode').value;
+            const existingSgId = document.getElementById('prov-existing-sgs').value;
+            
+            let sgProtocol = 'tcp'; let sgPorts = '22';
+            if (sgSelectionType === 'create-custom') {
+                sgProtocol = document.getElementById('prov-sg-proto').value;
+                sgPorts = document.getElementById('prov-sg-ports').value;
+                if(!sgPorts) return alert("Please enter port numbers.");
+            }
+
+            if(!credId || !awsKeyName) return alert("Missing required Credential/Key options.");
+
+            document.getElementById('provision-form').style.display = 'none';
+            document.getElementById('provision-status').style.display = 'block';
+            document.getElementById('provision-status').innerText = '⏳ Executing dynamic Terraform Provisioning pipeline (Est 30-45s)...';
+
+            const cancelBtn = document.getElementById('prov-cancel-btn');
+            if (cancelBtn) cancelBtn.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/ec2-provision', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: user, credId, osType, customAmi, instanceType, awsKeyName, storageSize, sgSelectionType, existingSgId, sgProtocol, sgPorts, region})
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('provision-status').innerText = `✅ Launch complete!\nIP resolved: ${data.ip}`;
+                    document.getElementById('ssh-host').value = data.ip; 
+                    
+                    if (cancelBtn) {
+                        cancelBtn.innerText = 'OK';
+                        cancelBtn.classList.remove('btn-reset');
+                        cancelBtn.classList.add('btn-restore');
+                        cancelBtn.style.display = 'inline-block';
+                    }
+
+                    await syncAwsRegionData();
+                    
+                    setTimeout(() => {
+                        closeModal('provision-modal');
+                        document.getElementById('provision-form').style.display = 'flex';
+                        document.getElementById('provision-status').style.display = 'none';
+                        if (cancelBtn) {
+                            cancelBtn.innerText = 'Cancel';
+                            cancelBtn.classList.remove('btn-restore');
+                            cancelBtn.classList.add('btn-reset');
+                        }
+                    }, 4000);
+                } else {
+                    document.getElementById('provision-status').innerText = `❌ Error: ${await res.text()}`;
+                    document.getElementById('provision-form').style.display = 'flex';
+                    if (cancelBtn) cancelBtn.style.display = 'inline-block';
+                }
+            } catch (err) {
+                document.getElementById('provision-status').innerText = `❌ Network Error: ${err.message}`;
+                document.getElementById('provision-form').style.display = 'flex';
+                if (cancelBtn) cancelBtn.style.display = 'inline-block';
+            }
+        }
+
+        function drawSparkline(canvas, data, color) {
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            ctx.clearRect(0, 0, w, h);
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            
+            if (data.length === 0) return;
+
+            const step = w / (data.length - 1);
+            for(let i = 0; i < data.length; i++) {
+                const x = i * step;
+                const y = h - ((data[i] / 100) * h);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.fillStyle = color + '22'; 
+            ctx.fill();
+        }
+
+        async function executePower(termId, action) {
+            const credSelect = document.getElementById(`power-cred-${termId}`);
+            const credId = credSelect.value;
+            const regionSelect = document.getElementById(`power-region-${termId}`);
+            const region = regionSelect ? regionSelect.value : "us-east-1";
+            
+            const identifier = document.getElementById(`power-instance-${termId}`).innerText !== "---" ? document.getElementById(`power-instance-${termId}`).innerText : document.getElementById(`edit-host-${termId}`).value;
+            
+            if(!credId) return alert("Select an AWS Credential to send power commands.");
+            
+            const btn = event.target; const origText = btn.innerText;
+            btn.innerText = "⏳..."; btn.disabled = true;
+
+            const res = await fetch('/api/ec2-power', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, credId, identifier, action, region})
+            });
+
+            if(res.ok) {
+                const data = await res.json();
+                const instanceId = data.instanceId;
+                document.getElementById(`power-instance-${termId}`).innerText = instanceId;
+                
+                if (action === 'stop' || action === 'terminate') {
+                    document.getElementById(`power-ip-${termId}`).innerText = action === 'stop' ? "Stopped" : "Terminated";
+                    document.getElementById(`power-ip-${termId}`).style.color = "#ef4444";
+                    activeSessions.find(s => s.id === termId).socket.disconnect(); 
+                    btn.innerText = `✅ ${action}ed`;
+                    setTimeout(() => { 
+                        btn.innerText = origText; btn.disabled = false; 
+                        if (action === 'terminate') closeTerminal(termId); 
+                    }, 3000);
+                } else if (action === 'start' || action === 'restart') {
+                    btn.innerText = action === 'start' ? "Booting..." : "Restarting...";
+                    const progressBar = document.getElementById(`power-progress-${termId}`);
+                    const progressFill = document.getElementById(`power-bar-fill-${termId}`);
+                    const statusText = document.getElementById(`power-status-text-${termId}`);
+                    
+                    progressBar.style.display = 'block';
+                    statusText.style.display = 'inline';
+                    progressFill.style.width = '10%';
+                    statusText.innerText = "Contacting AWS...";
+
+                    let attempts = 0;
+                    const poll = setInterval(async () => {
+                        attempts++;
+                        progressFill.style.width = `${Math.min(10 + (attempts * 10), 90)}%`; 
+
+                        try {
+                            const statRes = await fetch(`/api/ec2-status?credId=${credId}&instanceId=${instanceId}&username=${user}&region=${region}`);
+                            if (statRes.ok) {
+                                const statData = await statRes.json();
+                                statusText.innerText = `AWS State: ${statData.state}...`;
+
+                                if (statData.state === 'running' && statData.ip) {
+                                    clearInterval(poll);
+                                    progressFill.style.width = '100%';
+                                    statusText.innerText = "Online!";
+                                    
+                                    document.getElementById(`power-ip-${termId}`).innerText = statData.ip;
+                                    document.getElementById(`power-ip-${termId}`).style.color = "#10b981";
+                                    document.getElementById(`edit-host-${termId}`).value = statData.ip;
+                                    
+                                    setTimeout(() => {
+                                        progressBar.style.display = 'none';
+                                        statusText.style.display = 'none';
+                                        btn.innerText = origText;
+                                        btn.disabled = false;
+                                    }, 3000);
+                                }
+                            }
+                        } catch(e) {}
+
+                        if (attempts > 18) {
+                            clearInterval(poll);
+                            statusText.innerText = "Timeout waiting for IP.";
+                            btn.innerText = origText; btn.disabled = false;
+                        }
+                    }, 5000);
+                }
+            } else { alert(`Action Failed: ${await res.text()}`); btn.innerText = origText; btn.disabled = false; }
+        }
+
+        async function saveAwsCreds() {
+            const alias = document.getElementById('aws-alias').value; const access_key = document.getElementById('aws-key').value; const secret_key = document.getElementById('aws-secret').value;
+            if(!alias || !access_key || !secret_key) return alert("All fields required");
+            await fetch('/api/aws-creds', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: user, alias, access_key, secret_key})});
+            document.getElementById('aws-alias').value = ''; document.getElementById('aws-key').value = ''; document.getElementById('aws-secret').value = '';
+            await loadAwsCreds(); 
+            closeModal('aws-modal'); 
+            
+            if (document.getElementById('provision-modal').style.display === 'flex') {
+                const newCred = awsCreds[awsCreds.length - 1];
+                if (newCred) {
+                    document.getElementById('prov-cred').value = newCred.id;
+                    handleCredSelectionChange();
+                }
+            } else {
+                openManageModal(); 
+            }
+        }
+
+        function openAwsModal() { document.getElementById('aws-modal').style.display = 'flex'; }
+        async function syncToServer() { const customUsers = knownUsernames.filter(u => !defaultUsers.includes(u)); await fetch('/api/ssh-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, hosts: knownHosts, usernames: customUsers, history: sessionHistory }) }); }
+        async function saveData(type, value) { let changed = false; if(type === 'user' && !knownUsernames.includes(value)) { knownUsernames.push(value); changed = true; } if(type === 'host' && !knownHosts.includes(value)) { knownHosts.push(value); changed = true; } if (changed) { await syncToServer(); initData(); } }
+        async function loadKeys() { const res = await fetch(`/api/keys/${user}`); serverKeys = await res.json(); document.getElementById('ssh-key-dropdown').innerHTML = serverKeys.length ? serverKeys.map(k => `<option value="${k.file_path}">${k.key_name}</option>`).join('') : '<option value="">No keys saved</option>'; }
+        function fallbackCopyTextToClipboard(t) { const textArea = document.createElement("textarea"); textArea.value = t; textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea); }
+
+        function createTerminal(hostVal, userVal, keyVal, nameVal, restoreId) {
+            const host = hostVal || document.getElementById('ssh-host').value;
+            const sshUser = userVal || document.getElementById('ssh-user').value;
+            const keyPath = keyVal || document.getElementById('ssh-key-dropdown').value;
+            const displayName = nameVal || document.getElementById('ssh-name').value || `${sshUser}@${host}`;
+            const termId = restoreId || 'term-' + Date.now();
+
+            if (!host || !sshUser || !keyPath) return showError("Please fill in Host, Username, and select a Key.");
+            hideError(); saveData('user', sshUser); saveData('host', host);
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'terminal-wrapper'; wrapper.id = `wrapper-${termId}`; wrapper.style.order = activeSessions.length; 
+            
+            const awsCredOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : `<option value="">No AWS Credentials</option>`;
+
+            wrapper.innerHTML = `
+                <div class="terminal-header" style="flex-direction: column; align-items: stretch; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                            <button class="term-btn" onclick="moveTerminal('${termId}', 'left')">⬅️</button>
+                            <span style="color: #38bdf8; font-size: 16px; margin-left: 5px;">🖥️</span>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="text" id="edit-name-${termId}" value="${displayName}" class="inline-edit-name" style="padding-right: 22px;">
+                                <span style="position: absolute; right: 6px; font-size: 14px; color: #64748b; pointer-events: none;">&#9998;</span>
+                            </div>
+                            <button class="term-btn" onclick="moveTerminal('${termId}', 'right')">➡️</button>
+                        </div>
+                        <div>
+                            <span id="status-${termId}" style="color: #eab308; margin-right: 15px; font-size: 12px;">Connecting...</span>
+                            <button class="term-btn" style="color: #38bdf8;" onclick="triggerUpload('${termId}')">Upload</button>
+                            <button class="term-btn" style="color: #10b981;" onclick="triggerDownload('${termId}')">Download</button>
+                            <button class="term-btn" onclick="duplicateTerminal('${termId}')">Duplicate</button>
+                            <button class="term-btn" onclick="reconnectTerminal('${termId}')">Refresh</button>
+                            <button class="term-btn close" style="font-weight: bold; padding: 4px 10px;" onclick="closeTerminal('${termId}')">X</button>
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex; justify-content:space-between; align-items: center; font-size:12px; background:#0f172a; padding:6px 12px; border-radius:4px; border: 1px solid #1e293b; gap: 10px;">
+                        <div style="display:flex; align-items:center; gap:2px; border-right: 1px solid #334155; padding-right: 15px;">
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <span style="position: absolute; left: 4px; font-size: 12px; color: #64748b;">&#9998;</span>
+                                <input type="text" id="edit-user-${termId}" value="${sshUser}" class="inline-edit-conn" style="width: 80px; text-align: right; padding-left: 18px;">
+                            </div>
+                            <span style="color:#64748b; margin: 0 4px;">@</span>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="text" id="edit-host-${termId}" value="${host}" class="inline-edit-conn" style="width: 120px; text-align: left; padding-right: 18px;">
+                                <span style="position: absolute; right: 4px; font-size: 12px; color: #64748b;">&#9998;</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;"><span id="stat-cpu-text-${termId}">CPU: Waiting...</span><canvas id="canvas-cpu-${termId}" width="60" height="16" style="background:#1e293b; border-radius:2px;"></canvas></div>
+                        <div style="display:flex; align-items:center; gap:8px;"><span id="stat-ram-text-${termId}">RAM: Waiting...</span><canvas id="canvas-ram-${termId}" width="60" height="16" style="background:#1e293b; border-radius:2px;"></canvas></div>
+                        <div style="display:flex; align-items:center; gap:8px;"><span id="stat-disk-text-${termId}">DISK (/): Waiting...</span><div style="width:60px; height:6px; background:#1e293b; border-radius:3px; overflow:hidden;"><div id="bar-disk-${termId}" style="width:0%; height:100%; background:#f59e0b; transition: width 0.3s;"></div></div></div>
+                    </div>
+                </div>
+                
+                <div class="terminal-container" id="${termId}"></div>
+
+                <div class="power-bar">
+                    <div style="display:flex; gap: 8px; align-items: center;">
+                        <span style="color: #94a3b8; font-size: 12px; font-weight: bold;">EC2 Power:</span>
+                        <select id="power-cred-${termId}" style="min-width: 140px; padding: 2px; font-size: 11px; background: #0f172a; border: 1px solid #475569; color: white;">${awsCredOptions}</select>
+                        <select id="power-region-${termId}" style="padding: 2px; font-size: 11px; background: #0f172a; border: 1px solid #475569; color: white;">${awsRegionOptions}</select>
+                        <button class="pwr-btn start" onclick="executePower('${termId}', 'start')">▶ Start</button>
+                        <button class="pwr-btn" onclick="executePower('${termId}', 'restart')">↻ Restart</button>
+                        <button class="pwr-btn stop" onclick="executePower('${termId}', 'stop')">⏸ Stop</button>
+                        <button class="pwr-btn term" onclick="if(confirm('TERMINATE this instance permanently?')) executePower('${termId}', 'terminate')">☠ Terminate</button>
+                        
+                        <div id="power-progress-${termId}" style="display:none; width: 100px; height: 6px; background: #334155; border-radius: 3px; overflow: hidden; margin-left: 10px;">
+                            <div id="power-bar-fill-${termId}" style="width: 0%; height: 100%; background: #10b981; transition: width 0.5s;"></div>
+                        </div>
+                        <span id="power-status-text-${termId}" style="font-size: 10px; color: #94a3b8; margin-left: 5px; display:none;">Initializing...</span>
+                    </div>
+                    <div style="color: #64748b; font-size: 12px; font-family: monospace;">
+                        ID: <span id="power-instance-${termId}" style="color:#e2e8f0; margin-right: 15px;">---</span>
+                        IP: <span id="power-ip-${termId}" style="color:#10b981; font-weight:bold;">${host}</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('workspace').appendChild(wrapper);
+
+            const term = new Terminal({ cursorBlink: true, fontSize: 15, fontFamily: 'Consolas, monospace', theme: { background: '#0b0f19', foreground: '#e2e8f0' }});
+            
+            term.onResize(size => {
+                if (sessionData.socket && sessionData.socket.connected) {
+                    sessionData.socket.emit('resize', { cols: size.cols, rows: size.rows });
+                }
+            });
+
+            term.attachCustomKeyEventHandler(e => { if (e.key.startsWith('F') && !isNaN(e.key.slice(1))) { if (e.type === 'keydown') e.preventDefault(); return true; } return true; });
+            const fitAddon = new FitAddon.FitAddon(); term.loadAddon(fitAddon); term.open(document.getElementById(termId));
+            setTimeout(() => { fitAddon.fit(); }, 50);
+
+            term.onSelectionChange(() => {
+                const selection = term.getSelection();
+                if (selection) {
+                    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+                        navigator.clipboard.writeText(selection).catch(() => fallbackCopyTextToClipboard(selection));
+                    } else { fallbackCopyTextToClipboard(selection); }
+                }
+            });
+
+            document.getElementById(termId).addEventListener('contextmenu', async (e) => {
+                if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
+                    e.preventDefault(); 
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (text && sessionData.socket) { sessionData.socket.emit('terminal-input', text); term.clearSelection(); }
+                    } catch (err) {}
+                }
+            });
+
+            const socket = io();
+            const sessionData = { id: termId, host, user: sshUser, keyPath, name: displayName, socket, term, fitAddon, cpuHistory: new Array(20).fill(0), ramHistory: new Array(20).fill(0)};
+            activeSessions.push(sessionData); connectSocket(sessionData);
+            document.getElementById('ssh-name').value = '';
+        }
+
+        function duplicateTerminal(termId) { const session = activeSessions.find(s => s.id === termId); if(session) createTerminal(session.host, session.user, session.keyPath, session.name); }
+        
+        // FIXED: The new Upload function uses a terminal 'mv' command to pull the file perfectly into your CURRENT directory
+        function triggerUpload(termId) {
+            const session = activeSessions.find(s => s.id === termId);
+            if (!session) return;
+            
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                const tempPath = `/tmp/up_${Date.now()}_${safeName}`;
+                
+                // Track this specific upload so the terminal knows exactly what to do when SFTP completes
+                session.pendingUpload = safeName;
+                session.pendingTempPath = tempPath;
+
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    session.term.write(`\r\n\x1b[36m📤 Uploading ${file.name} to current directory...\x1b[0m\r\n`);
+                    session.socket.emit('sftp-upload', { remotePath: tempPath, fileData: evt.target.result });
+                };
+                reader.readAsArrayBuffer(file);
+            };
+            input.click();
+        }
+
+        // FIXED: The new Download function uses a terminal 'cp' command to push the file perfectly out of your CURRENT directory
+        function triggerDownload(termId) {
+            const session = activeSessions.find(s => s.id === termId);
+            if (!session) return;
+
+            const fileName = prompt("📥 Enter the exact name of the file in your CURRENT terminal directory to download:\n(e.g., app.log)");
+            if (!fileName) return;
+
+            const safeName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const dlId = Date.now();
+            const tempPath = `/tmp/dl_${dlId}_${safeName}`;
+            
+            session.term.write(`\r\n\x1b[36m📥 Preparing download for ${fileName}...\x1b[0m\r\n`);
+            
+            // Tell the bash shell to copy the file from the user's current directory to the global /tmp folder
+            session.socket.emit('terminal-input', ` cp "./${fileName}" ${tempPath}\r`);
+            
+            // Give the terminal 1.5 seconds to finish the copy, then trigger the backend SFTP download
+            setTimeout(() => {
+                session.socket.emit('sftp-download', tempPath);
+                
+                // Delete the temporary file from the server after a few seconds to keep it clean
+                setTimeout(() => {
+                    if (session.socket && session.socket.connected) {
+                        session.socket.emit('terminal-input', ` rm -f ${tempPath}\r`);
+                    }
+                }, 5000);
+            }, 1500);
+        }
+
+        function connectSocket(session) {
+            session.socket.emit('start-ssh', { 
+                host: session.host, 
+                user: session.user, 
+                keyPath: session.keyPath,
+                cols: session.term.cols,
+                rows: session.term.rows 
+            });
+
+            session.socket.on('ssh-status', (msg) => {
+                const el = document.getElementById(`status-${session.id}`); if(el) { el.innerText = msg; el.style.color = msg.includes('success') ? '#10b981' : '#fff'; }
+                if (msg.includes('closed') || msg.includes('Disconnected')) { session.term.write(`\r\n\x1b[33m\r\n*** ${msg} ***\x1b[0m\r\n`); }
+            });
+
+            // FIXED: Automatically runs the 'mv' command inside the shell to move the file into the exact PWD directory
+            session.socket.on('sftp-success', (msg) => { 
+                if (session.pendingTempPath && session.pendingUpload) {
+                    session.term.write(`\r\n\x1b[32m${msg}. Finalizing...\x1b[0m\r\n`);
+                    session.socket.emit('terminal-input', ` mv ${session.pendingTempPath} "./${session.pendingUpload}"\r`);
+                    session.pendingTempPath = null;
+                    session.pendingUpload = null;
+                } else {
+                    session.term.write(`\r\n\x1b[32m${msg}\x1b[0m\r\n`); 
+                }
+            });
+
+            session.socket.on('sftp-download-ready', (data) => {
+                const blob = new Blob([data.fileData]); const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.style.display = 'none'; a.href = url; 
+                
+                // Remove our invisible temp tracking prefix so the user just gets their exact file name back
+                let cleanName = data.fileName;
+                if (cleanName.startsWith('dl_')) {
+                    cleanName = cleanName.split('_').slice(2).join('_');
+                }
+                
+                a.download = cleanName;
+                document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url); document.body.removeChild(a);
+                session.term.write(`\r\n\x1b[32mDownload triggered for ${cleanName}\x1b[0m\r\n`);
+            });
+
+            session.socket.on('ssh-error', (msg) => {
+                session.term.write(`\r\n\x1b[31mERROR: ${msg}\x1b[0m\r\n`);
+                const el = document.getElementById(`status-${session.id}`); if(el) { el.innerText = "Disconnected"; el.style.color = "#ef4444"; }
+            });
+
+            session.socket.on('stat-update', (data) => {
+                const parts = data.split('|');
+                if(parts.length >= 8) {
+                    const cpuUsagePerc = parseFloat(parts[0] || 0); const cpuCores = parseInt(parts[1] || 1); const cpuUsedCores = ((cpuUsagePerc / 100) * cpuCores).toFixed(2);
+                    session.cpuHistory.push(cpuUsagePerc); session.cpuHistory.shift();
+                    
+                    const cpuEl = document.getElementById(`stat-cpu-text-${session.id}`);
+                    if(cpuEl) cpuEl.innerHTML = `<b style="color:#38bdf8;">CPU:</b> ${cpuUsedCores}/${cpuCores} (${cpuUsagePerc.toFixed(1)}%)`;
+                    drawSparkline(document.getElementById(`canvas-cpu-${session.id}`), session.cpuHistory, '#38bdf8');
+                    
+                    const ramUsed = parts[2]; const ramTotal = parts[3]; const ramPerc = ramTotal > 0 ? Math.round((ramUsed / ramTotal) * 100) : 0;
+                    session.ramHistory.push(ramPerc); session.ramHistory.shift();
+                    
+                    const ramEl = document.getElementById(`stat-ram-text-${session.id}`);
+                    if(ramEl) ramEl.innerHTML = `<b style="color:#10b981;">RAM:</b> ${ramUsed}MB / ${ramTotal}MB (${ramPerc}%)`;
+                    drawSparkline(document.getElementById(`canvas-ram-${session.id}`), session.ramHistory, '#10b981');
+                    
+                    const diskEl = document.getElementById(`stat-disk-text-${session.id}`);
+                    if(diskEl) diskEl.innerHTML = `<b style="color:#f59e0b;">DISK:</b> ${parts[4]}/${parts[5]} | ${parts[7]} Free`;
+                    const diskBar = document.getElementById(`bar-disk-${session.id}`); if(diskBar) diskBar.style.width = parts[6];
+                }
+            });
+
+            if (session.dataListener) session.dataListener.dispose();
+            session.dataListener = session.term.onData(data => session.socket.emit('terminal-input', data));
+
+            session.socket.on('terminal-output', data => session.term.write(data));
+        }
+
+        function reconnectTerminal(termId) {
+            const session = activeSessions.find(s => s.id === termId);
+            if(session) {
+                session.name = document.getElementById(`edit-name-${termId}`).value.trim(); session.user = document.getElementById(`edit-user-${termId}`).value.trim(); session.host = document.getElementById(`edit-host-${termId}`).value.trim();
+                saveData('user', session.user); saveData('host', session.host);
+                session.socket.disconnect(); session.term.clear();
+                session.term.write(`\x1b[33mReconnecting to ${session.user}@${session.host}...\x1b[0m\r\n`);
+                session.socket = io(); connectSocket(session);
+            }
+        }
+
+        async function closeTerminal(termId) {
+            const sessionIndex = activeSessions.findIndex(s => s.id === termId);
+            if(sessionIndex > -1) { 
+                const session = activeSessions[sessionIndex];
+                const finalName = document.getElementById(`edit-name-${termId}`).value.trim(); const finalUser = document.getElementById(`edit-user-${termId}`).value.trim(); const finalHost = document.getElementById(`edit-host-${termId}`).value.trim();
+                const autoSaveName = `Auto-Save: ${finalName} (${new Date().toLocaleTimeString()})`;
+                const safeState = [{ host: finalHost, user: finalUser, keyPath: session.keyPath, name: finalName }];
+                sessionHistory.unshift({ name: autoSaveName, date: new Date().toLocaleString(), sessions: safeState });
+                syncToServer(); session.socket.disconnect(); activeSessions.splice(sessionIndex, 1); 
+            }
+            document.getElementById(`wrapper-${termId}`).remove(); if(currentLayout === 'split') requestSplitLayout();
+        }
+
+        function resetActiveWorkspace() { activeSessions.forEach(s => s.socket.disconnect()); activeSessions = []; document.getElementById('workspace').innerHTML = ''; }
+        function setLayout(type) { currentLayout = type; document.getElementById('workspace').className = `workspace ${type}`; if(type === 'horizontal') activeSessions.forEach(s => document.getElementById(`wrapper-${s.id}`).style.display = 'flex'); setTimeout(() => { activeSessions.forEach(s => { s.fitAddon.fit(); s.socket.emit('resize', {cols: s.term.cols, rows: s.term.rows}); }); }, 100); }
+        function requestSplitLayout() { if (activeSessions.length <= 2) return setLayout('split'); document.getElementById('split-options').innerHTML = activeSessions.map(s => `<label class="checkbox-row"><input type="checkbox" class="split-checkbox" value="${s.id}"> ${s.name}</label>`).join(''); document.getElementById('split-modal').style.display = 'flex'; }
+        function applySplitSelection() { const checked = Array.from(document.querySelectorAll('.split-checkbox:checked')).map(cb => cb.value); if (checked.length !== 2) return alert("Select exactly 2 terminals."); closeModal('split-modal'); currentLayout = 'split'; document.getElementById('workspace').className = `workspace split`; activeSessions.forEach(s => { document.getElementById(`wrapper-${s.id}`).style.display = checked.includes(s.id) ? 'flex' : 'none'; }); setTimeout(() => { activeSessions.forEach(s => { if(checked.includes(s.id)) { s.fitAddon.fit(); s.socket.emit('resize', {cols: s.term.cols, rows: s.term.rows}); } }); }, 100); }
+
+        function openHistoryModal() {
+            document.getElementById('history-list').innerHTML = sessionHistory.length ? sessionHistory.map((h, i) => `<li><span><b>${h.name}</b> (${h.sessions.length} terminals) - ${h.date}</span><div><select id="restore-layout-${i}" style="padding:2px; font-size:12px;"><option value="horizontal">Horizontal</option><option value="split">Split</option></select><button class="btn btn-restore" style="padding:4px 8px; font-size:12px; margin-left:5px;" onclick="restoreHistory(${i})">Restore</button><button class="manage-del-btn" style="margin-left:10px;" onclick="deleteHistory(${i})">🗑️</button></div></li>`).join('') : '<li>No saved sessions found.</li>';
+            document.getElementById('history-modal').style.display = 'flex';
+        }
+        
+        function restoreHistory(index) { const layout = document.getElementById(`restore-layout-${index}`).value; const targetSession = sessionHistory[index]; resetActiveWorkspace(); closeModal('history-modal'); targetSession.sessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name)); if(layout === 'split' && targetSession.sessions.length > 2) requestSplitLayout(); else setLayout(layout); }
+        async function deleteHistory(index) { sessionHistory.splice(index, 1); await syncToServer(); openHistoryModal(); }
+
+        function openManageModal() {
+            document.getElementById('manage-aws-list').innerHTML = awsCreds.length ? awsCreds.map(c => `<li>${c.alias} [${c.access_key.substring(0,6)}...] <button class="manage-del-btn" onclick="deleteAwsCredsFromManage(${c.id})">Delete</button></li>`).join('') : '<li>No AWS Credentials saved.</li>';
+            document.getElementById('manage-hosts-list').innerHTML = knownHosts.map((h, i) => `<li>${h} <button class="manage-del-btn" onclick="deleteData('host', ${i})">Delete</button></li>`).join('');
+            document.getElementById('manage-users-list').innerHTML = knownUsernames.map((u, i) => `<li>${u} ${defaultUsers.includes(u) ? '<span style="color:#94a3b8; font-size:12px;">(Default)</span>' : `<button class="manage-del-btn" onclick="deleteData('user', ${i})">Delete</button>`}</li>`).join('');
+            document.getElementById('manage-keys-list').innerHTML = serverKeys.map(k => `<li>${k.key_name} <button class="manage-del-btn" onclick="deleteKey(${k.id})">Delete</button></li>`).join('');
+            document.getElementById('manage-modal').style.display = 'flex';
+        }
+        
+        async function deleteAwsCredsFromManage(id) { await fetch(`/api/aws-creds/${id}`, { method: 'DELETE' }); await loadAwsCreds(); openManageModal(); }
+
+        async function deleteData(type, index) {
+            if(type === 'host') { knownHosts.splice(index, 1); }
+            if(type === 'user') { const customUsers = knownUsernames.filter(u => !defaultUsers.includes(u)); const target = knownUsernames[index]; const cIndex = customUsers.indexOf(target); if(cIndex > -1) { customUsers.splice(cIndex, 1); knownUsernames = [...defaultUsers, ...customUsers]; } }
+            await syncToServer(); openManageModal(); 
+        }
+        async function deleteKey(id) { if(confirm("Permanently delete this key?")) { await fetch(`/api/keys/${id}`, { method: 'DELETE' }); await loadKeys(); openManageModal(); } }
+        async function clearAllData(type) {
+            if(type === 'hosts') { knownHosts = []; await syncToServer(); }
+            if(type === 'users') { knownUsernames = [...defaultUsers]; await syncToServer(); }
+            if(type === 'keys') { if(confirm("Delete ALL keys?")) await fetch(`/api/keys/all/${user}`, { method: 'DELETE' }); await loadKeys(); }
+            openManageModal();
+        }
+
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function showError(msg) { document.getElementById('error-msg').innerText = msg; document.getElementById('error-msg').style.display = 'block'; }
+        function hideError() { document.getElementById('error-msg').style.display = 'none'; }
+        window.addEventListener('resize', () => { activeSessions.forEach(s => { if(document.getElementById(`wrapper-${s.id}`).style.display !== 'none') { s.fitAddon.fit(); s.socket.emit('resize', {cols: s.term.cols, rows: s.term.rows}); } }); });
+
+        window.addEventListener('beforeunload', (event) => {
+            const safeState = activeSessions.map(s => {
+                const hostInput = document.getElementById(`edit-host-${s.id}`);
+                const userInput = document.getElementById(`edit-user-${s.id}`);
+                const nameInput = document.getElementById(`edit-name-${s.id}`);
+                return {
+                    host: hostInput ? hostInput.value.trim() : s.host,
+                    user: userInput ? userInput.value.trim() : s.user,
+                    name: nameInput ? nameInput.value.trim() : s.name,
+                    keyPath: s.keyPath 
+                };
+            });
+            
+            localStorage.setItem('cidr_workspace_' + user, JSON.stringify(safeState));
+
+            if (activeSessions.length > 0) {
+                sessionHistory.unshift({ name: `Auto-Save: Browser Closed (${new Date().toLocaleTimeString()})`, date: new Date().toLocaleString(), sessions: safeState });
+                
+                if (sessionHistory.length > 20) sessionHistory = sessionHistory.slice(0, 20); 
+
+                const customUsers = knownUsernames.filter(u => !defaultUsers.includes(u));
+                
+                fetch('/api/ssh-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, hosts: knownHosts, usernames: customUsers, history: sessionHistory }),
+                    keepalive: true
+                }).catch(e => console.error(e));
+            }
+        });
+
+        initData();
+    </script>
+</body>
+</html>
