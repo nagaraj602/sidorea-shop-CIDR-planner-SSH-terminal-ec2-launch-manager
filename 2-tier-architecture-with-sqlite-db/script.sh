@@ -91,8 +91,6 @@ fi
 
 echo "✅ App Setup Completed Successfully!"
 echo "Application Status : ONLINE"
-echo "Application URL    : http://$PUBLIC_IP"
-echo
 
 ############################################
 # SSL / HTTPS Configuration
@@ -103,6 +101,36 @@ echo "2) No"
 read -p "Enter choice (1/2): " SSL_CHOICE
 
 if [ "$SSL_CHOICE" != "1" ]; then
+    echo "🌐 Configuring Nginx for Local IP routing..."
+    
+    # Install Nginx if missing
+    if ! command -v nginx >/dev/null; then
+        echo "⚙️ Installing Nginx..."
+        sudo apt install nginx -y >/dev/null 2>&1
+    fi
+
+    # Set up reverse proxy for Port 80 -> Port 3000
+    sudo tee /etc/nginx/sites-available/cidr-app > /dev/null << 'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+EOF
+
+    sudo ln -sf /etc/nginx/sites-available/cidr-app /etc/nginx/sites-enabled/cidr-app
+    sudo rm -f /etc/nginx/sites-enabled/default
+    sudo systemctl restart nginx
+
     echo "Skipping SSL setup. Your app is accessible at http://$PUBLIC_IP"
     exit 0
 fi
