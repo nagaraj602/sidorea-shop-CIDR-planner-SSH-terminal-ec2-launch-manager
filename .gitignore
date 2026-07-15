@@ -1,0 +1,13 @@
+# Ignore all files and folders by default
+/*
+/*/
+
+# Whitelist files and folders to track
+!.gitignore
+!public/
+!Dockerfile
+!k8s-manifest.yaml
+!package.json
+!README.md
+!server.js
+!script.sh
