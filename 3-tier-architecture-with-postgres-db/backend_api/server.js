@@ -311,24 +311,47 @@ app.post('/api/ec2-provision', async (req, res) => {
 data "aws_ami" "selected" {
   most_recent = true
   owners      = ["${owner}"]
-  filter { name = "name", values = ["${filterName}"] }
-}`;
+  filter {
+    name   = "name"
+    values = ["${filterName}"]
+  }
+}
+`;
             amiAssignment = `ami = data.aws_ami.selected.id`;
         }
 
         const tfConfig = `
-provider "aws" { region = "${region}", access_key = "${creds.access_key}", secret_key = "${creds.secret_key}" }
+provider "aws" {
+  region     = "${region}"
+  access_key = "${creds.access_key}"
+  secret_key = "${creds.secret_key}"
+}
+
 ${dataBlock}
+
 resource "aws_instance" "web" {
   ${amiAssignment}
   instance_type          = "${instanceType || 't2.micro'}"
   key_name               = "${awsKeyName}"
   vpc_security_group_ids = ["${finalSgId}"]
-  root_block_device { volume_size = ${storageSize || 8}, volume_type = "gp3" }
-  tags = { Name = "Sidorea-Provisioned-${osType}" }
+  
+  root_block_device { 
+    volume_size = ${storageSize || 8}
+    volume_type = "gp3" 
+  }
+  
+  tags = { 
+    Name = "Sidorea-Provisioned-${osType}" 
+  }
 }
-output "instance_ip" { value = aws_instance.web.public_ip }
-output "instance_id" { value = aws_instance.web.id }
+
+output "instance_ip" {
+  value = aws_instance.web.public_ip
+}
+
+output "instance_id" {
+  value = aws_instance.web.id
+}
 `;
         fs.writeFileSync(path.join(workspace, 'main.tf'), tfConfig);
 
