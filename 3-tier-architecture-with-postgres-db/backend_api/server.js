@@ -14,7 +14,8 @@ const {
     StartInstancesCommand, RebootInstancesCommand, TerminateInstancesCommand, 
     CreateSecurityGroupCommand, AuthorizeSecurityGroupIngressCommand, 
     DescribeKeyPairsCommand, DescribeVpcsCommand, 
-    DescribeSecurityGroupsCommand, DescribeImagesCommand 
+    DescribeSecurityGroupsCommand, DescribeImagesCommand,
+    CreateKeyPairCommand // Included for Dynamic Key Creation
 } = require("@aws-sdk/client-ec2");
 
 const app = express();
@@ -180,6 +181,43 @@ app.get('/api/aws-sgs/:username', async (req, res) => {
         const result = await pool.query(`SELECT * FROM aws_sgs WHERE username = $1`, [req.params.username.toLowerCase()]);
         res.json(result.rows);
     } catch (err) { res.status(500).send(err.message); }
+});
+
+// --- AWS Dynamic Key Pair Creator ---
+app.post('/api/aws-create-keypair', async (req, res) => {
+    const { username, credId, region, keyName } = req.body;
+    
+    try {
+        const result = await pool.query(`SELECT * FROM aws_credentials WHERE id = $1 AND username = $2`, [credId, username.toLowerCase()]);
+        if (result.rows.length === 0) return res.status(404).send("Credentials not found.");
+        const creds = result.rows[0];
+
+        const client = new EC2Client({ region: region, credentials: { accessKeyId: creds.access_key, secretAccessKey: creds.secret_key } });
+        
+        // Instruct AWS to generate the Key Pair
+        const command = new CreateKeyPairCommand({ KeyName: keyName });
+        const response = await client.send(command);
+
+        // Save the Private Key material to the local data/keys directory securely
+        const safeKeyName = keyName.replace(/[^a-zA-Z0-9_-]/g, '');
+        const fileName = `aws_${Date.now()}_${safeKeyName}.pem`;
+        const filePath = path.join(keysDir, fileName);
+        
+        // Save with strictly isolated read-only permissions (0o400) required by SSH
+        fs.writeFileSync(filePath, response.KeyMaterial, { mode: 0o400 });
+
+        // Save to PostgreSQL database so it shows up in the SSH tool
+        await pool.query(`INSERT INTO ssh_keys (username, key_name, file_path) VALUES ($1, $2, $3)`, [(username || "").toLowerCase(), keyName, filePath]);
+
+        // Return both the success message and the raw key material for browser download
+        res.status(200).json({ 
+            message: "Key Pair created successfully.", 
+            keyName: keyName,
+            keyMaterial: response.KeyMaterial 
+        });
+    } catch (error) { 
+        res.status(500).send(error.message); 
+    }
 });
 
 // --- AWS Region Data Fetcher (Keys, SGs, AMIs) ---
