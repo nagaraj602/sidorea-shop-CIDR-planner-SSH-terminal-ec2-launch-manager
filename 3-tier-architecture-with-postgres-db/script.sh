@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script is to install everything on your bare metal server and make the app up without using docker or Kubernetes.
+# This script is to install everything on your bare metal server and make the app up without using docker or Kubernetes. App uses port 3000 but nginx will reverse proxy it and app runs on port 80 (HTTP) or 443 (HTTPS)
 
 # Detect Linux Distribution
 distro=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
