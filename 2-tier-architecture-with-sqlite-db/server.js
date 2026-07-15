@@ -19,7 +19,8 @@ const {
     DescribeKeyPairsCommand, 
     DescribeVpcsCommand, 
     DescribeSecurityGroupsCommand, 
-    DescribeImagesCommand 
+    DescribeImagesCommand,
+    CreateKeyPairCommand // Included for Dynamic Key Creation
 } = require("@aws-sdk/client-ec2");
 
 const app = express();
@@ -178,6 +179,46 @@ app.get('/api/aws-sgs/:username', (req, res) => {
     db.all(`SELECT * FROM aws_sgs WHERE username = ?`, [req.params.username.toLowerCase()], (err, rows) => {
         res.json(rows);
     }); 
+});
+
+// --- AWS Dynamic Key Pair Creator ---
+app.post('/api/aws-create-keypair', (req, res) => {
+    const { username, credId, region, keyName } = req.body;
+    
+    db.get(`SELECT * FROM aws_credentials WHERE id = ? AND username = ?`, [credId, username.toLowerCase()], async (err, creds) => {
+        if (err || !creds) return res.status(404).send("Credentials not found.");
+
+        try {
+            const client = new EC2Client({ region: region, credentials: { accessKeyId: creds.access_key, secretAccessKey: creds.secret_key } });
+            
+            // Instruct AWS to generate the Key Pair
+            const command = new CreateKeyPairCommand({ KeyName: keyName });
+            const response = await client.send(command);
+
+            // Save the Private Key material to the local data/keys directory securely
+            const safeKeyName = keyName.replace(/[^a-zA-Z0-9_-]/g, '');
+            const fileName = `aws_${Date.now()}_${safeKeyName}.pem`;
+            const filePath = path.join(keysDir, fileName);
+            
+            // Save with strictly isolated read-only permissions (0o400) required by SSH
+            fs.writeFileSync(filePath, response.KeyMaterial, { mode: 0o400 });
+
+            // Save to SQLite database so it shows up in the SSH tool
+            db.run(`INSERT INTO ssh_keys (username, key_name, file_path) VALUES (?, ?, ?)`, 
+            [(username || "").toLowerCase(), keyName, filePath], function(insertErr) {
+                if (insertErr) return res.status(500).send(insertErr.message);
+                
+                // Return both the success message and the raw key material for browser download
+                res.status(200).json({ 
+                    message: "Key Pair created successfully.", 
+                    keyName: keyName,
+                    keyMaterial: response.KeyMaterial 
+                });
+            });
+        } catch (error) { 
+            res.status(500).send(error.message); 
+        }
+    });
 });
 
 // --- AWS Region Data Fetcher (Keys, SGs, AMIs) ---
