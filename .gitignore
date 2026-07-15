@@ -1,1 +1,50 @@
+# Node.js dependencies
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
 
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Environment files
+.env
+.env.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Runtime files
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Build output
+dist/
+build/
+coverage/
+
+# IDE/editor directories
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Docker artifacts
+docker-compose.override.yml
+
+# Kubernetes artifacts
+*.kubeconfig
+
+# Misc
+*.swp
+*.swo
