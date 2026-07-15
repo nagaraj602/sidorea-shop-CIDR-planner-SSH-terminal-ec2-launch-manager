@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This script is to install everything on your bare metal server and make the app up without using docker or Kubernetes.
+
 # Detect Linux Distribution
 distro=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
 
