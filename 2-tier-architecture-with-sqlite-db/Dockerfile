@@ -1,35 +1,42 @@
 # ==========================================
-# STAGE 1: Dependency Builder
+# STAGE 1: Build & Dependencies
 # ==========================================
-FROM node:18-bullseye-slim AS builder
+FROM node:20-alpine AS builder
+
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Install build dependencies required for sqlite3 and ssh2 native modules
+RUN apk add --no-cache python3 make g++ 
+
+# Copy package files and install all dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install
 
-# ==========================================
-# STAGE 2: Final Runtime Image
-# ==========================================
-FROM node:18-bullseye-slim
-WORKDIR /app
-
-# Install Terraform and required system tools
-RUN apt-get update && apt-get install -y \
-    wget unzip gnupg software-properties-common curl \
-    && wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg >/dev/null \
-    && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list \
-    && apt-get update && apt-get install -y terraform \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Copy Node modules from builder
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy application source code
+# Copy the rest of the monolithic application (server.js, public folder, etc.)
 COPY . .
 
-# Expose the port your app runs on
-EXPOSE 80
+# ==========================================
+# STAGE 2: Production Runtime
+# ==========================================
+FROM node:20-alpine
 
-# Start the application
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Install Terraform (Required by server.js child_process)
+RUN apk add --no-cache curl unzip \
+    && curl -O https://releases.hashicorp.com/terraform/1.8.0/terraform_1.8.0_linux_amd64.zip \
+    && unzip terraform_1.8.0_linux_amd64.zip -d /usr/local/bin/ \
+    && rm terraform_1.8.0_linux_amd64.zip \
+    && apk del curl unzip
+
+# Copy the compiled Node modules and app code from the builder stage
+COPY --from=builder /app /app
+
+# Create the data directory for SQLite and Terraform workspaces
+RUN mkdir -p /app/data/keys /app/data/terraform_workspaces
+
+EXPOSE 3000
+
 CMD ["node", "server.js"]
