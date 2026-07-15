@@ -136,3 +136,8 @@ echo "✅ App Setup Completed Successfully!"
 echo "Application Status : ONLINE"
 echo "Application URL    : http://$PUBLIC_IP"
 echo
+echo "If you want to start, stop or restart application, you can run following commands:"
+echo "sudo pm2 start sidorea-api"
+echo "sudo pm2 stop sidorea-api"
+echo "sudo pm2 restart sidorea-api"
+echo
