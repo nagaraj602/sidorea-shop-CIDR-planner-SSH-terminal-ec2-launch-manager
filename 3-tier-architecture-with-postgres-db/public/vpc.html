@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AWS VPC Builder</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root { --bg: #f4f4f5; --card-bg: white; --text: #334155; --border: #cbd5e1; --primary: #2563eb; }
+        body.dark-mode { --bg: #0f172a; --card-bg: #1e293b; --text: #e2e8f0; --border: #475569; --primary: #3b82f6; }
+        body { font-family: system-ui; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1500px; margin: auto; background: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .layout { display: grid; grid-template-columns: 480px 1fr; gap: 30px; }
+        .config-panel { max-height: 85vh; overflow-y: auto; padding-right: 15px; }
+        .section { background: var(--bg); padding: 15px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 15px; }
+        .section h3 { margin-top: 0; color: var(--primary); font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; background: var(--card-bg); padding: 8px; border-radius: 4px; border: 1px solid var(--border); }
+        input, select { padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; background: var(--card-bg); color: var(--text); }
+        button.add-btn { background: var(--primary); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        button.del-btn { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+        .output-area { display: flex; flex-direction: column; gap: 15px; height: 85vh; }
+        .tabs { display: flex; gap: 10px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+        .tab { padding: 8px 16px; cursor: pointer; font-weight: bold; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); }
+        .tab.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .code-block { background: #1e293b; color: #a5b4fc; padding: 20px; border-radius: 6px; font-family: monospace; font-size: 13px; white-space: pre-wrap; overflow-y: auto; flex-grow: 1; line-height: 1.4; }
+        
+        /* Visualizer classes */
+        .visualizer { flex-grow: 1; background: #f8fafc; border: 2px dashed var(--border); border-radius: 6px; padding: 20px; overflow-y: auto; }
+        .vis-vpc { border: 3px solid #10b981; border-radius: 8px; padding: 15px; background: var(--card-bg); }
+        .vis-az-container { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 15px; }
+        .vis-az { border: 2px dashed #3b82f6; border-radius: 6px; padding: 10px; min-width: 240px; flex: 1; background: var(--bg); }
+        .vis-subnet { padding: 10px; border-radius: 4px; margin-bottom: 8px; border: 1px solid; }
+        .vis-subnet.public { background: #dcfce7; color: #166534; border-color: #86efac; }
+        .vis-subnet.private { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+        .vis-node { background: var(--card-bg); border: 1px solid var(--border); padding: 4px 8px; margin-top: 5px; border-radius: 3px; font-size: 11px; color: var(--text); }
+    </style>
+    <script src="navbar.js"></script>
+</head>
+<body>
+    <div class="container" style="margin-top: 80px;">
+        <div class="layout">
+            <!-- Configuration Forms -->
+            <div class="config-panel">
+                <div class="section">
+                    <h3>Base Network Configuration</h3>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <input type="text" id="vpc-name" value="custom-vpc">
+                        <input type="text" id="vpc-cidr" value="10.0.0.0/16">
+                        <input type="text" id="aws-region" value="us-east-1" placeholder="Region">
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>Availability Zones <button class="add-btn" onclick="addAZ()">+ Add AZ</button></h3>
+                    <div id="az-list"></div>
+                </div>
+
+                <div class="section">
+                    <h3>Subnet Infrastructure <button class="add-btn" onclick="addSubnet()">+ Add Subnet</button></h3>
+                    <div id="subnet-list"></div>
+                </div>
+
+                <div class="section">
+                    <h3>Compute Deployments (EC2) <button class="add-btn" onclick="addEC2()">+ Add EC2 Instance</button></h3>
+                    <div id="ec2-list"></div>
+                </div>
+
+                <div class="section">
+                    <h3>Security Groups Rules <button class="add-btn" onclick="addSG()">+ Add Rule</button></h3>
+                    <div id="sg-list"></div>
+                </div>
+
+                <div class="section">
+                    <h3>Custom Component Integrations</h3>
+                    <div id="services-config">
+                        <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="cfg-alb" onchange="toggleSrvDom('alb')"> <b>Enable ALB</b></label>
+                        <div id="dom-alb" style="padding-left:15px; display:none; margin-bottom:10px;">
+                            <input type="text" id="alb-name" value="app-alb" placeholder="ALB Name">
+                            <input type="number" id="alb-port" value="80" placeholder="Listener Port">
+                        </div>
+                        
+                        <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="cfg-asg" onchange="toggleSrvDom('asg')"> <b>Enable Auto Scaling</b></label>
+                        <div id="dom-asg" style="padding-left:15px; display:none; margin-bottom:10px;">
+                            Min: <input type="number" id="asg-min" value="2" style="width:60px;">
+                            Max: <input type="number" id="asg-max" value="4" style="width:60px;">
+                        </div>
+
+                        <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="cfg-cf"> <b>CloudFront CDN</b></label>
+                        <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="cfg-s3"> <b>S3 Storage Bucket</b></label>
+                        <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="cfg-sns"> <b>SNS Alerts Topic</b></label>
+                        <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="cfg-ecr"> <b>ECR Docker Registry</b></label>
+                        <label style="display:block; margin-bottom:8px;"><input type="checkbox" id="cfg-cw"> <b>CloudWatch Metric Alarms</b></label>
+                    </div>
+                </div>
+
+                <button class="generate-btn" style="width:100%; padding:12px; background:#16a34a; color:white; font-weight:bold; border:none; border-radius:4px; cursor:pointer;" onclick="buildArchitecture()">Compile & Render Architecture</button>
+            </div>
+
+            <!-- Visual and Code outputs -->
+            <div class="output-area">
+                <div class="tabs">
+                    <div class="tab active" onclick="switchOutTab('vis')">Visual Architecture Map</div>
+                    <div class="tab" onclick="switchOutTab('tf')">Compiled Terraform HCL</div>
+                </div>
+                <div id="view-vis" class="visualizer"></div>
+                <div id="view-tf" class="code-block" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let state = {
+            azs: ['us-east-1a', 'us-east-1b'],
+            subnets: [
+                { id: 1, name: 'Web-Subnet-A', cidr: '10.0.1.0/24', az: 'us-east-1a', type: 'public' },
+                { id: 2, name: 'App-Subnet-A', cidr: '10.0.2.0/24', az: 'us-east-1a', type: 'private' }
+            ],
+            ec2s: [
+                { id: 1, name: 'Web-Server-01', type: 't3.micro', subnet: 'Web-Subnet-A' }
+            ],
+            sgs: [
+                { id: 1, name: 'Web-SG', port: '80', source: '0.0.0.0/0' }
+            ]
+        };
+
+        function toggleSrvDom(srv) {
+            document.getElementById(`dom-${srv}`).style.display = document.getElementById(`cfg-${srv}`).checked ? 'block' : 'none';
+        }
+
+        function switchOutTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('view-vis').style.display = tab === 'vis' ? 'block' : 'none';
+            document.getElementById('view-tf').style.display = tab === 'tf' ? 'block' : 'none';
+        }
+
+        function addAZ() { state.azs.push(`us-east-1${String.fromCharCode(97 + state.azs.length)}`); renderUiInputs(); }
+        function addSubnet() { state.subnets.push({ id: Date.now(), name: 'Subnet-New', cidr: '10.0.3.0/24', az: state.azs[0], type: 'public' }); renderUiInputs(); }
+        function addEC2() { state.ec2s.push({ id: Date.now(), name: 'EC2-Instance', type: 't3.micro', subnet: state.subnets[0]?.name || '' }); renderUiInputs(); }
+        function addSG() { state.sgs.push({ id: Date.now(), name: 'Custom-SG', port: '443', source: '0.0.0.0/0' }); renderUiInputs(); }
+
+        function renderUiInputs() {
+            document.getElementById('az-list').innerHTML = state.azs.map((az, i) => `
+                <div class="row"><input type="text" value="${az}" onchange="state.azs[${i}]=this.value"><button class="del-btn" onclick="state.azs.splice(${i},1);renderUiInputs();">X</button></div>
+            `).join('');
+
+            document.getElementById('subnet-list').innerHTML = state.subnets.map((sub, i) => `
+                <div class="row">
+                    <input type="text" value="${sub.name}" style="width:100px;" onchange="state.subnets[${i}].name=this.value">
+                    <input type="text" value="${sub.cidr}" style="width:100px;" onchange="state.subnets[${i}].cidr=this.value">
+                    <select onchange="state.subnets[${i}].type=this.value"><option value="public" ${sub.type=='public'?'selected':''}>Public</option><option value="private" ${sub.type=='private'?'selected':''}>Private</option></select>
+                    <select onchange="state.subnets[${i}].az=this.value">${state.azs.map(az=>`<option value="${az}" ${sub.az==az?'selected':''}>${az}</option>`).join('')}</select>
+                    <button class="del-btn" onclick="state.subnets.splice(${i},1);renderUiInputs();">X</button>
+                </div>
+            `).join('');
+
+            document.getElementById('ec2-list').innerHTML = state.ec2s.map((ec2, i) => `
+                <div class="row">
+                    <input type="text" value="${ec2.name}" style="width:100px;" onchange="state.ec2s[${i}].name=this.value">
+                    <input type="text" value="${ec2.type}" style="width:80px;" onchange="state.ec2s[${i}].type=this.value">
+                    <select onchange="state.ec2s[${i}].subnet=this.value">${state.subnets.map(s=>`<option value="${s.name}" ${ec2.subnet==s.name?'selected':''}>${s.name}</option>`).join('')}</select>
+                    <button class="del-btn" onclick="state.ec2s.splice(${i},1);renderUiInputs();">X</button>
+                </div>
+            `).join('');
+
+            document.getElementById('sg-list').innerHTML = state.sgs.map((sg, i) => `
+                <div class="row" style="flex-wrap:nowrap;">
+                    <input type="text" value="${sg.name}" placeholder="SG Name" style="flex:1; min-width:80px;" onchange="state.sgs[${i}].name=this.value">
+                    <input type="text" value="${sg.port}" placeholder="Port" style="width:60px;" onchange="state.sgs[${i}].port=this.value">
+                    <input type="text" value="${sg.source}" placeholder="Source" style="flex:1.5; min-width:100px;" onchange="state.sgs[${i}].source=this.value">
+                    <button class="del-btn" onclick="state.sgs.splice(${i},1);renderUiInputs();">X</button>
+                </div>
+            `).join('');
+        }
+
+        function buildArchitecture() {
+            // Visual Rendering
+            const vpcName = document.getElementById('vpc-name').value;
+            const cidr = document.getElementById('vpc-cidr').value;
+            let visHTML = `<div class="vis-vpc"><div class="vis-vpc-title">☁️ VPC: ${vpcName} (${cidr})</div><div class="vis-az-container">`;
+            
+            state.azs.forEach(az => {
+                visHTML += `<div class="vis-az"><div class="vis-az-title">📍 ${az}</div>`;
+                state.subnets.filter(s => s.az === az).forEach(sub => {
+                    visHTML += `<div class="vis-subnet ${sub.type}">📦 ${sub.name} (${sub.cidr})`;
+                    state.ec2s.filter(e => e.subnet === sub.name).forEach(ec2 => {
+                        visHTML += `<div class="vis-node">💻 EC2: ${ec2.name} [${ec2.type}]</div>`;
+                    });
+                    visHTML += `</div>`;
+                });
+                visHTML += `</div>`;
+            });
+            visHTML += `</div></div>`;
+            document.getElementById('view-vis').innerHTML = visHTML;
+
+            // Terraform Compiler
+            let tf = `provider "aws" {\n  region = "${document.getElementById('aws-region').value}"\n}\n\n`;
+            tf += `resource "aws_vpc" "main" {\n  cidr_block = "${cidr}"\n  enable_dns_hostnames = true\n  tags = { Name = "${vpcName}" }\n}\n\n`;
+            
+            state.subnets.forEach(s => {
+                tf += `resource "aws_subnet" "${s.name.toLowerCase()}" {\n  vpc_id = aws_vpc.main.id\n  cidr_block = "${s.cidr}"\n  availability_zone = "${s.az}"\n  tags = { Name = "${s.name}" }\n}\n\n`;
+            });
+
+            state.ec2s.forEach(e => {
+                tf += `resource "aws_instance" "${e.name.toLowerCase()}" {\n  ami = "ami-0c55b159cbfafe1f0"\n  instance_type = "${e.type}"\n  subnet_id = aws_subnet.${e.subnet.toLowerCase()}.id\n  tags = { Name = "${e.name}" }\n}\n\n`;
+            });
+
+            state.sgs.forEach(sg => {
+                tf += `resource "aws_security_group" "${sg.name.toLowerCase()}" {\n  name = "${sg.name}"\n  vpc_id = aws_vpc.main.id\n  ingress {\n    from_port = ${sg.port}\n    to_port = ${sg.port}\n    protocol = "tcp"\n    cidr_blocks = ["${sg.source}"]\n  }\n}\n\n`;
+            });
+
+            if(document.getElementById('cfg-s3').checked) tf += `resource "aws_s3_bucket" "bucket" {\n  bucket = "${vpcName}-dynamic-bucket"\n}\n\n`;
+            if(document.getElementById('cfg-ecr').checked) tf += `resource "aws_ecr_repository" "repo" {\n  name = "${vpcName}-repo"\n}\n\n`;
+            if(document.getElementById('cfg-alb').checked) tf += `resource "aws_lb" "alb" {\n  name = "${document.getElementById('alb-name').value}"\n  load_balancer_type = "application"\n}\n\n`;
+
+            document.getElementById('view-tf').innerText = tf;
+        }
+
+        renderUiInputs();
+        buildArchitecture();
+    </script>
+</body>
+</html>

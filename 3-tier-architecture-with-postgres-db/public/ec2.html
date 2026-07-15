@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>EC2 Instance Types Reference</title>
+    <style>
+        body { font-family: system-ui; background: var(--bg); color: var(--text); margin: 0; padding: 20px; transition: background 0.3s; }
+        .container { max-width: 1400px; margin: auto; background: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .decoder-box { background: #1e293b; color: #a5b4fc; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 14px; margin-bottom: 20px; border-left: 4px solid var(--primary); }
+        
+        .layout { display: grid; grid-template-columns: 250px 1fr; gap: 30px; }
+        .sidebar-menu { display: flex; flex-direction: column; gap: 10px; }
+        .menu-btn { padding: 12px; text-align: left; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .menu-btn:hover { border-color: var(--primary); }
+        .menu-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        
+        .content-pane { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 25px; display: none; }
+        .content-pane.active { display: block; }
+        .content-pane h2 { margin-top: 0; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+        .series-tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-right: 5px; font-size: 13px; margin-bottom: 5px;}
+        .note-box { background: #dcfce7; border-left: 4px solid #10b981; padding: 10px 15px; color: #065f46; margin: 15px 0; border-radius: 0 4px 4px 0; font-size: 14px;}
+        
+        ul { line-height: 1.6; }
+    </style>
+    <script src="navbar.js"></script>
+</head>
+<body>
+    <div class="container" style="margin-top: 80px;">
+        <h1 style="margin-top:0;">EC2 Instance Types</h1>
+        
+        <div class="decoder-box">
+            <b>EC2 Naming Suffix Decoder (Example: m7g.large)</b><br>
+            • <b>m</b> : Family (General Purpose)<br>
+            • <b>7</b> : 7th Generation<br>
+            • <b>g</b> : Graviton Processor (a = AMD, i = Intel)<br>
+            • <b>d</b> : Instance Storage (Ephemeral NVMe SSD - highly fast, different from EBS)
+        </div>
+
+        <div class="layout">
+            <div class="sidebar-menu">
+                <button class="menu-btn active" onclick="showPane('general')">1. General Purpose</button>
+                <button class="menu-btn" onclick="showPane('compute')">2. Compute Optimized</button>
+                <button class="menu-btn" onclick="showPane('memory')">3. Memory Optimized</button>
+                <button class="menu-btn" onclick="showPane('storage')">4. Storage Optimized</button>
+                <button class="menu-btn" onclick="showPane('accel')">5. Accelerated Computing</button>
+                <button class="menu-btn" onclick="showPane('hpc')">6. HPC Optimized</button>
+            </div>
+
+            <div class="content-area">
+                <!-- General Purpose -->
+                <div id="general" class="content-pane active">
+                    <h2>General Purpose Instances</h2>
+                    <p>Provide a balance of compute, memory, and networking resources. Used for webservers, code repositories, and small-to-medium databases.</p>
+                    
+                    <h3>M Series (Production)</h3>
+                    <div><span class="series-tag">M7g</span><span class="series-tag">M6i</span><span class="series-tag">M5</span></div>
+                    <ul>
+                        <li>Balanced resources, good for small to medium database, enterprise applications, webservers.</li>
+                        <li>Considered the standard for production works in an organization.</li>
+                    </ul>
+
+                    <h3>T Series (Dev/Test)</h3>
+                    <div><span class="series-tag">T4g</span><span class="series-tag">T3</span><span class="series-tag">T2</span></div>
+                    <ul>
+                        <li>Burstable performance instances. Provide a baseline CPU performance with the ability to "burst" above the baseline using CPU credits.</li>
+                        <li>Ideal for applications with variable/low-to-moderate CPU usage (small web servers, microservices, CI/CD pipelines).</li>
+                        <li>Typically used for development & testing environments.</li>
+                    </ul>
+                </div>
+
+                <!-- Compute Optimized -->
+                <div id="compute" class="content-pane">
+                    <h2>Compute Optimized Instances</h2>
+                    <p>Ideal for compute-bound applications that benefit from high-performance processors.</p>
+                    <h3>C Series</h3>
+                    <div><span class="series-tag">C Series</span></div>
+                    <div class="note-box">
+                        <b>Use Cases:</b> Batch processing, gaming servers, machine learning inference, media transcoding.
+                    </div>
+                </div>
+
+                <!-- Memory Optimized -->
+                <div id="memory" class="content-pane">
+                    <h2>Memory Optimized Instances</h2>
+                    <p>Designed to deliver fast performance for workloads that process large data sets in memory.</p>
+                    <h3>R, X, and Z Series</h3>
+                    <div>
+                        <span class="series-tag">R Series (R8g, R7g, R6g, R5)</span>
+                        <span class="series-tag">X Series (X2gd, X1e)</span>
+                        <span class="series-tag">Z Series (Z1d)</span>
+                    </div>
+                    <div class="note-box">
+                        <b>Use Cases:</b> Data warehouse applications (requires fast processing), high-performance databases, big data analytics, real-time processing.
+                    </div>
+                    <p><b>Note on Instance Storage (d):</b> Some instances (like X2gd) feature Ephemeral Storage. It is highly fast NVMe SSD storage located on the host hardware (excellent for weather forecast applications), but it is volatile and different from persistent EBS.</p>
+                </div>
+
+                <!-- Storage Optimized -->
+                <div id="storage" class="content-pane">
+                    <h2>Storage Optimized Instances</h2>
+                    <p>Deliver millions of low-latency, random I/O operations per second. Designed for workloads requiring high, sequential read/write access to massive local datasets.</p>
+                    <h3>I, D, and H Series</h3>
+                    <div>
+                        <span class="series-tag">I Series (I4i, I3en, I3)</span>
+                        <span class="series-tag">D Series (D3en, D2)</span>
+                        <span class="series-tag">H1 Series</span>
+                    </div>
+                    <div class="note-box">
+                        <b>Use Cases:</b> Big data applications (e.g., Instagram backend), high-throughput databases, log processing, data streaming.
+                    </div>
+                </div>
+
+                <!-- Accelerated Computing -->
+                <div id="accel" class="content-pane">
+                    <h2>Accelerated Computing (GPU)</h2>
+                    <p>Use hardware accelerators (co-processors) to perform functions more efficiently, such as floating point number calculations or graphics processing.</p>
+                    <h3>P, G, and F Series</h3>
+                    <div>
+                        <span class="series-tag">P Series (P3)</span>
+                        <span class="series-tag">G Series (G4)</span>
+                        <span class="series-tag">F Series (F1 - FPGAs)</span>
+                    </div>
+                    <div class="note-box">
+                        <b>Use Cases:</b> Machine learning, graphics rendering, scientific simulations, specialized pattern matching.
+                    </div>
+                </div>
+
+                <!-- HPC Optimized -->
+                <div id="hpc" class="content-pane">
+                    <h2>High Performance Computing (HPC)</h2>
+                    <p>Offers the best price performance for running HPC workloads at scale. Ideal for complex simulations, deep learning, and VFX rendering.</p>
+                    <h3>HPC Series</h3>
+                    <div>
+                        <span class="series-tag">HPC8a</span>
+                        <span class="series-tag">HPC7a</span>
+                        <span class="series-tag">HPC7g</span>
+                        <span class="series-tag">HPC6id</span>
+                        <span class="series-tag">HPC6a</span>
+                    </div>
+                    <p><b>Reminder on Suffixes:</b> <i>a</i> = AMD, <i>g</i> = Graviton, <i>i</i> = Intel, <i>d</i> = Instance (ephemeral) storage.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPane(id) {
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.content-pane').forEach(pane => pane.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(id).classList.add('active');
+        }
+    </script>
+</body>
+</html>
