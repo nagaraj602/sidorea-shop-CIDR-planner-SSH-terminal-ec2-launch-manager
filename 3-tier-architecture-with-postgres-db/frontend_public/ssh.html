@@ -67,9 +67,9 @@
         .manage-del-btn:hover { text-decoration: underline; }
         .form-label { font-size: 12px; font-weight: bold; color: #64748b; margin-top: 5px; }
 
-        /* Styles for disabled form fields to indicate locked state */
         select:disabled, input:disabled, button:disabled { background-color: var(--bg); cursor: not-allowed; opacity: 0.7; }
     </style>
+    <script src="/navbar.js"></script>
 </head>
 <body>
     <div class="container" style="margin-top: 80px;">
@@ -351,7 +351,7 @@
                 if (localWorkspace) {
                     const savedSessions = JSON.parse(localWorkspace);
                     if (savedSessions && savedSessions.length > 0) {
-                        savedSessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name));
+                        savedSessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name, null, s.region));
                         setLayout('horizontal');
                     }
                     localStorage.removeItem('cidr_workspace_' + user);
@@ -359,7 +359,7 @@
                 else if (sessionHistory.length > 0 && activeSessions.length === 0) {
                     const targetSession = sessionHistory[0];
                     if (targetSession.sessions && targetSession.sessions.length > 0) {
-                        targetSession.sessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name));
+                        targetSession.sessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name, null, s.region));
                         setLayout('horizontal');
                     }
                 }
@@ -390,7 +390,6 @@
                 if (res.ok) {
                     const data = await res.json(); 
 
-                    // Trigger the browser download for the .pem file
                     const blob = new Blob([data.keyMaterial], { type: 'text/plain' });
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -404,10 +403,9 @@
 
                     alert(`✅ Key Pair '${keyName}' created successfully in AWS!\n\nThe private key has been saved to the server and downloaded to your computer.`);
 
-                    await syncAwsRegionData(); // Refresh the AWS dropdown
-                    await loadKeys(); // Refresh the main SSH Terminal keys
+                    await syncAwsRegionData(); 
+                    await loadKeys(); 
 
-                    // Auto-select the newly created key in the dropdown
                     setTimeout(() => { document.getElementById('prov-aws-key').value = keyName; }, 500);
                 } else {
                     alert(`❌ Failed to create key: ${await res.text()}`);
@@ -425,7 +423,15 @@
             const name = prompt("Enter a name for this session layout:", `Session ${new Date().toLocaleTimeString()}`);
             if (!name) return; 
             
-            const safeState = activeSessions.map(s => { return { host: document.getElementById(`edit-host-${s.id}`).value.trim(), user: document.getElementById(`edit-user-${s.id}`).value.trim(), name: document.getElementById(`edit-name-${s.id}`).value.trim(), keyPath: s.keyPath }; });
+            const safeState = activeSessions.map(s => { 
+                return { 
+                    host: document.getElementById(`edit-host-${s.id}`).value.trim(), 
+                    user: document.getElementById(`edit-user-${s.id}`).value.trim(), 
+                    name: document.getElementById(`edit-name-${s.id}`).value.trim(), 
+                    keyPath: s.keyPath,
+                    region: document.getElementById(`power-region-${s.id}`).value 
+                }; 
+            });
             sessionHistory.unshift({ name, date: new Date().toLocaleString(), sessions: safeState });
             if (sessionHistory.length > 20) sessionHistory = sessionHistory.slice(0, 20); 
             
@@ -701,119 +707,16 @@
             ctx.fill();
         }
 
-        async function executePower(termId, action) {
-            const credSelect = document.getElementById(`power-cred-${termId}`);
-            const credId = credSelect.value;
-            const regionSelect = document.getElementById(`power-region-${termId}`);
-            const region = regionSelect ? regionSelect.value : "us-east-1";
-            
-            const identifier = document.getElementById(`power-instance-${termId}`).innerText !== "---" ? document.getElementById(`power-instance-${termId}`).innerText : document.getElementById(`edit-host-${termId}`).value;
-            
-            if(!credId) return alert("Select an AWS Credential to send power commands.");
-            
-            const btn = event.target; const origText = btn.innerText;
-            btn.innerText = "⏳..."; btn.disabled = true;
-
-            const res = await fetch('/api/ec2-power', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: user, credId, identifier, action, region})
-            });
-
-            if(res.ok) {
-                const data = await res.json();
-                const instanceId = data.instanceId;
-                document.getElementById(`power-instance-${termId}`).innerText = instanceId;
-                
-                if (action === 'stop' || action === 'terminate') {
-                    document.getElementById(`power-ip-${termId}`).innerText = action === 'stop' ? "Stopped" : "Terminated";
-                    document.getElementById(`power-ip-${termId}`).style.color = "#ef4444";
-                    activeSessions.find(s => s.id === termId).socket.disconnect(); 
-                    btn.innerText = `✅ ${action}ed`;
-                    setTimeout(() => { 
-                        btn.innerText = origText; btn.disabled = false; 
-                        if (action === 'terminate') closeTerminal(termId); 
-                    }, 3000);
-                } else if (action === 'start' || action === 'restart') {
-                    btn.innerText = action === 'start' ? "Booting..." : "Restarting...";
-                    const progressBar = document.getElementById(`power-progress-${termId}`);
-                    const progressFill = document.getElementById(`power-bar-fill-${termId}`);
-                    const statusText = document.getElementById(`power-status-text-${termId}`);
-                    
-                    progressBar.style.display = 'block';
-                    statusText.style.display = 'inline';
-                    progressFill.style.width = '10%';
-                    statusText.innerText = "Contacting AWS...";
-
-                    let attempts = 0;
-                    const poll = setInterval(async () => {
-                        attempts++;
-                        progressFill.style.width = `${Math.min(10 + (attempts * 10), 90)}%`; 
-
-                        try {
-                            const statRes = await fetch(`/api/ec2-status?credId=${credId}&instanceId=${instanceId}&username=${user}&region=${region}`);
-                            if (statRes.ok) {
-                                const statData = await statRes.json();
-                                statusText.innerText = `AWS State: ${statData.state}...`;
-
-                                if (statData.state === 'running' && statData.ip) {
-                                    clearInterval(poll);
-                                    progressFill.style.width = '100%';
-                                    statusText.innerText = "Online!";
-                                    
-                                    document.getElementById(`power-ip-${termId}`).innerText = statData.ip;
-                                    document.getElementById(`power-ip-${termId}`).style.color = "#10b981";
-                                    document.getElementById(`edit-host-${termId}`).value = statData.ip;
-                                    
-                                    setTimeout(() => {
-                                        progressBar.style.display = 'none';
-                                        statusText.style.display = 'none';
-                                        btn.innerText = origText;
-                                        btn.disabled = false;
-                                    }, 3000);
-                                }
-                            }
-                        } catch(e) {}
-
-                        if (attempts > 18) {
-                            clearInterval(poll);
-                            statusText.innerText = "Timeout waiting for IP.";
-                            btn.innerText = origText; btn.disabled = false;
-                        }
-                    }, 5000);
-                }
-            } else { alert(`Action Failed: ${await res.text()}`); btn.innerText = origText; btn.disabled = false; }
-        }
-
-        async function saveAwsCreds() {
-            const alias = document.getElementById('aws-alias').value; const access_key = document.getElementById('aws-key').value; const secret_key = document.getElementById('aws-secret').value;
-            if(!alias || !access_key || !secret_key) return alert("All fields required");
-            await fetch('/api/aws-creds', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: user, alias, access_key, secret_key})});
-            document.getElementById('aws-alias').value = ''; document.getElementById('aws-key').value = ''; document.getElementById('aws-secret').value = '';
-            await loadAwsCreds(); 
-            closeModal('aws-modal'); 
-            
-            if (document.getElementById('provision-modal').style.display === 'flex') {
-                const newCred = awsCreds[awsCreds.length - 1];
-                if (newCred) {
-                    document.getElementById('prov-cred').value = newCred.id;
-                    handleCredSelectionChange();
-                }
-            } else {
-                openManageModal(); 
-            }
-        }
-
-        function openAwsModal() { document.getElementById('aws-modal').style.display = 'flex'; }
-        async function syncToServer() { const customUsers = knownUsernames.filter(u => !defaultUsers.includes(u)); await fetch('/api/ssh-data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, hosts: knownHosts, usernames: customUsers, history: sessionHistory }) }); }
-        async function saveData(type, value) { let changed = false; if(type === 'user' && !knownUsernames.includes(value)) { knownUsernames.push(value); changed = true; } if(type === 'host' && !knownHosts.includes(value)) { knownHosts.push(value); changed = true; } if (changed) { await syncToServer(); initData(); } }
-        async function loadKeys() { const res = await fetch(`/api/keys/${user}`); serverKeys = await res.json(); document.getElementById('ssh-key-dropdown').innerHTML = serverKeys.length ? serverKeys.map(k => `<option value="${k.file_path}">${k.key_name}</option>`).join('') : '<option value="">No keys saved</option>'; }
-        function fallbackCopyTextToClipboard(t) { const textArea = document.createElement("textarea"); textArea.value = t; textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); } catch (err) {} document.body.removeChild(textArea); }
-
-        function createTerminal(hostVal, userVal, keyVal, nameVal, restoreId) {
+        function createTerminal(hostVal, userVal, keyVal, nameVal, restoreId, regionVal) {
             const host = hostVal || document.getElementById('ssh-host').value;
             const sshUser = userVal || document.getElementById('ssh-user').value;
             const keyPath = keyVal || document.getElementById('ssh-key-dropdown').value;
             const displayName = nameVal || document.getElementById('ssh-name').value || `${sshUser}@${host}`;
+            
+            // Capture the currently selected region from the provision modal (if it's not disabled) to use as the default
+            const provRegionSelect = document.getElementById('prov-region');
+            const activeRegion = regionVal || (provRegionSelect && !provRegionSelect.disabled ? provRegionSelect.value : 'us-east-1');
+            
             const termId = restoreId || 'term-' + Date.now();
 
             if (!host || !sshUser || !keyPath) return showError("Please fill in Host, Username, and select a Key.");
@@ -823,6 +726,9 @@
             wrapper.className = 'terminal-wrapper'; wrapper.id = `wrapper-${termId}`; wrapper.style.order = activeSessions.length; 
             
             const awsCredOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : `<option value="">No AWS Credentials</option>`;
+            
+            // Dynamically set the 'selected' attribute so the dropdown matches the captured region
+            const activeRegionOptions = awsRegionOptions.replace(`value="${activeRegion}"`, `value="${activeRegion}" selected`);
 
             wrapper.innerHTML = `
                 <div class="terminal-header" style="flex-direction: column; align-items: stretch; gap: 10px;">
@@ -870,7 +776,7 @@
                     <div style="display:flex; gap: 8px; align-items: center;">
                         <span style="color: #94a3b8; font-size: 12px; font-weight: bold;">EC2 Power:</span>
                         <select id="power-cred-${termId}" style="min-width: 140px; padding: 2px; font-size: 11px; background: #0f172a; border: 1px solid #475569; color: white;">${awsCredOptions}</select>
-                        <select id="power-region-${termId}" style="padding: 2px; font-size: 11px; background: #0f172a; border: 1px solid #475569; color: white;">${awsRegionOptions}</select>
+                        <select id="power-region-${termId}" style="padding: 2px; font-size: 11px; background: #0f172a; border: 1px solid #475569; color: white;">${activeRegionOptions}</select>
                         <button class="pwr-btn start" onclick="executePower('${termId}', 'start')">▶ Start</button>
                         <button class="pwr-btn" onclick="executePower('${termId}', 'restart')">↻ Restart</button>
                         <button class="pwr-btn stop" onclick="executePower('${termId}', 'stop')">⏸ Stop</button>
@@ -926,7 +832,13 @@
             document.getElementById('ssh-name').value = '';
         }
 
-        function duplicateTerminal(termId) { const session = activeSessions.find(s => s.id === termId); if(session) createTerminal(session.host, session.user, session.keyPath, session.name); }
+        function duplicateTerminal(termId) { 
+            const session = activeSessions.find(s => s.id === termId); 
+            if(session) {
+                const currentRegion = document.getElementById(`power-region-${termId}`).value;
+                createTerminal(session.host, session.user, session.keyPath, session.name, null, currentRegion); 
+            }
+        }
         
         function triggerUpload(termId) {
             const session = activeSessions.find(s => s.id === termId);
@@ -1064,13 +976,96 @@
             }
         }
 
+        async function executePower(termId, action) {
+            const credSelect = document.getElementById(`power-cred-${termId}`);
+            const credId = credSelect.value;
+            const regionSelect = document.getElementById(`power-region-${termId}`);
+            const region = regionSelect ? regionSelect.value : "us-east-1";
+            
+            const identifier = document.getElementById(`power-instance-${termId}`).innerText !== "---" ? document.getElementById(`power-instance-${termId}`).innerText : document.getElementById(`edit-host-${termId}`).value;
+            
+            if(!credId) return alert("Select an AWS Credential to send power commands.");
+            
+            const btn = event.target; const origText = btn.innerText;
+            btn.innerText = "⏳..."; btn.disabled = true;
+
+            const res = await fetch('/api/ec2-power', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, credId, identifier, action, region})
+            });
+
+            if(res.ok) {
+                const data = await res.json();
+                const instanceId = data.instanceId;
+                document.getElementById(`power-instance-${termId}`).innerText = instanceId;
+                
+                if (action === 'stop' || action === 'terminate') {
+                    document.getElementById(`power-ip-${termId}`).innerText = action === 'stop' ? "Stopped" : "Terminated";
+                    document.getElementById(`power-ip-${termId}`).style.color = "#ef4444";
+                    activeSessions.find(s => s.id === termId).socket.disconnect(); 
+                    btn.innerText = `✅ ${action}ed`;
+                    setTimeout(() => { 
+                        btn.innerText = origText; btn.disabled = false; 
+                        if (action === 'terminate') closeTerminal(termId); 
+                    }, 3000);
+                } else if (action === 'start' || action === 'restart') {
+                    btn.innerText = action === 'start' ? "Booting..." : "Restarting...";
+                    const progressBar = document.getElementById(`power-progress-${termId}`);
+                    const progressFill = document.getElementById(`power-bar-fill-${termId}`);
+                    const statusText = document.getElementById(`power-status-text-${termId}`);
+                    
+                    progressBar.style.display = 'block';
+                    statusText.style.display = 'inline';
+                    progressFill.style.width = '10%';
+                    statusText.innerText = "Contacting AWS...";
+
+                    let attempts = 0;
+                    const poll = setInterval(async () => {
+                        attempts++;
+                        progressFill.style.width = `${Math.min(10 + (attempts * 10), 90)}%`; 
+
+                        try {
+                            const statRes = await fetch(`/api/ec2-status?credId=${credId}&instanceId=${instanceId}&username=${user}&region=${region}`);
+                            if (statRes.ok) {
+                                const statData = await statRes.json();
+                                statusText.innerText = `AWS State: ${statData.state}...`;
+
+                                if (statData.state === 'running' && statData.ip) {
+                                    clearInterval(poll);
+                                    progressFill.style.width = '100%';
+                                    statusText.innerText = "Online!";
+                                    
+                                    document.getElementById(`power-ip-${termId}`).innerText = statData.ip;
+                                    document.getElementById(`power-ip-${termId}`).style.color = "#10b981";
+                                    document.getElementById(`edit-host-${termId}`).value = statData.ip;
+                                    
+                                    setTimeout(() => {
+                                        progressBar.style.display = 'none';
+                                        statusText.style.display = 'none';
+                                        btn.innerText = origText;
+                                        btn.disabled = false;
+                                    }, 3000);
+                                }
+                            }
+                        } catch(e) {}
+
+                        if (attempts > 18) {
+                            clearInterval(poll);
+                            statusText.innerText = "Timeout waiting for IP.";
+                            btn.innerText = origText; btn.disabled = false;
+                        }
+                    }, 5000);
+                }
+            } else { alert(`Action Failed: ${await res.text()}`); btn.innerText = origText; btn.disabled = false; }
+        }
+
         async function closeTerminal(termId) {
             const sessionIndex = activeSessions.findIndex(s => s.id === termId);
             if(sessionIndex > -1) { 
                 const session = activeSessions[sessionIndex];
                 const finalName = document.getElementById(`edit-name-${termId}`).value.trim(); const finalUser = document.getElementById(`edit-user-${termId}`).value.trim(); const finalHost = document.getElementById(`edit-host-${termId}`).value.trim();
                 const autoSaveName = `Auto-Save: ${finalName} (${new Date().toLocaleTimeString()})`;
-                const safeState = [{ host: finalHost, user: finalUser, keyPath: session.keyPath, name: finalName }];
+                const safeState = [{ host: finalHost, user: finalUser, keyPath: session.keyPath, name: finalName, region: document.getElementById(`power-region-${termId}`).value }];
                 sessionHistory.unshift({ name: autoSaveName, date: new Date().toLocaleString(), sessions: safeState });
                 syncToServer(); session.socket.disconnect(); activeSessions.splice(sessionIndex, 1); 
             }
@@ -1087,7 +1082,7 @@
             document.getElementById('history-modal').style.display = 'flex';
         }
         
-        function restoreHistory(index) { const layout = document.getElementById(`restore-layout-${index}`).value; const targetSession = sessionHistory[index]; resetActiveWorkspace(); closeModal('history-modal'); targetSession.sessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name)); if(layout === 'split' && targetSession.sessions.length > 2) requestSplitLayout(); else setLayout(layout); }
+        function restoreHistory(index) { const layout = document.getElementById(`restore-layout-${index}`).value; const targetSession = sessionHistory[index]; resetActiveWorkspace(); closeModal('history-modal'); targetSession.sessions.forEach(s => createTerminal(s.host, s.user, s.keyPath, s.name, null, s.region)); if(layout === 'split' && targetSession.sessions.length > 2) requestSplitLayout(); else setLayout(layout); }
         async function deleteHistory(index) { sessionHistory.splice(index, 1); await syncToServer(); openHistoryModal(); }
 
         function openManageModal() {
@@ -1127,7 +1122,8 @@
                     host: hostInput ? hostInput.value.trim() : s.host,
                     user: userInput ? userInput.value.trim() : s.user,
                     name: nameInput ? nameInput.value.trim() : s.name,
-                    keyPath: s.keyPath 
+                    keyPath: s.keyPath,
+                    region: document.getElementById(`power-region-${s.id}`).value 
                 };
             });
             
