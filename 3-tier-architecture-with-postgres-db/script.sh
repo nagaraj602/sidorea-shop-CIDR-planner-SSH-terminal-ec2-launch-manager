@@ -23,7 +23,7 @@ sudo apt-get upgrade -y >/dev/null 2>&1
 
 # Install Required Packages (Added dnsutils for 'dig' command)
 echo "📦 Installing Required Packages..."
-sudo apt-get install -y nodejs npm curl wget gnupg software-properties-common ca-certificates apt-transport-https dnsutils >/dev/null 2>&1
+sudo apt install postgresql postgresql-contrib nodejs npm nginx curl wget gnupg software-properties-common ca-certificates apt-transport-https dnsutils -y >/dev/null 2>&1
 
 ############################################
 # Install Terraform
@@ -32,11 +32,60 @@ echo "🏗️ Installing Terraform..."
 if ! command -v terraform >/dev/null; then
     curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg >/dev/null 2>&1
     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null 2>&1
-    sudo apt-get update  >/dev/null 2>&1
+    sudo apt-get update >/dev/null 2>&1
     sudo apt-get install -y terraform >/dev/null 2>&1
 else
     echo "Terraform already installed."
 fi
+
+############################################
+# Configure PostgreSQL
+############################################
+echo "🗄️ Configuring Database..."
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+
+sudo -i -u postgres psql -c "CREATE DATABASE sidorea_db;"
+sudo -i -u postgres psql -c "CREATE USER sidorea_user WITH ENCRYPTED PASSWORD 'supersecurepassword';"
+sudo -i -u postgres psql -c "ALTER DATABASE sidorea_db OWNER TO sidorea_user;"
+
+############################################
+# Configure Nginx
+############################################
+echo "🌐 Configuring Nginx..."
+# Fix permissions so Nginx can read the directory
+sudo chmod 755 /home/ubuntu
+
+sudo tee /etc/nginx/sites-available/sidorea > /dev/null << 'EOF'
+server {
+    listen 80;
+    server_name localhost;
+
+    location / {
+        root /home/ubuntu/sidorea-shop-CIDR-planner-SSH-terminal-ec2-launch-manager/3-tier-architecture-with-postgres-db/frontend_public;
+        index index.html;
+        try_files $uri $uri.html $uri/ =404;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /socket.io/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+    }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/sidorea /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo systemctl restart nginx
 
 ############################################
 # Install PM2
@@ -49,25 +98,19 @@ else
 fi
 
 ############################################
-# Install Node Modules
+# Configure and Start Backend
 ############################################
 echo "📥 Installing Project Dependencies..."
+cd backend_api
 npm install >/dev/null 2>&1
 
-############################################
-# Start Application
-############################################
 echo "🚀 Starting Application..."
-
-if sudo pm2 describe cidr-app >/dev/null 2>&1; then
-    sudo pm2 restart cidr-app >/dev/null 2>&1
+if sudo pm2 describe sidorea-api >/dev/null 2>&1; then
+    sudo pm2 restart sidorea-api >/dev/null 2>&1
 else
-    sudo pm2 start server.js --name cidr-app >/dev/null 2>&1
+    sudo pm2 start server.js --name sidorea-api >/dev/null 2>&1
 fi
 
-############################################
-# Save PM2 Process List
-############################################
 sudo pm2 save >/dev/null 2>&1
 
 ############################################
@@ -76,7 +119,7 @@ sudo pm2 save >/dev/null 2>&1
 STATUS=$(sudo pm2 jlist | node -e '
 const fs=require("fs");
 const apps=JSON.parse(fs.readFileSync(0,"utf8"));
-const app=apps.find(a=>a.name==="cidr-app");
+const app=apps.find(a=>a.name==="sidorea-api");
 console.log(app ? app.pm2_env.status : "stopped");
 ')
 
@@ -84,8 +127,8 @@ PUBLIC_IP=$(curl -s ifconfig.me)
 echo
 
 if [ "$STATUS" != "online" ]; then
-    echo "❌ Application failed to start. Try restarting it using: sudo pm2 restart cidr-app"
-    echo "Check logs using: sudo pm2 logs cidr-app"
+    echo "❌ Application failed to start. Try restarting it using: sudo pm2 restart sidorea-api"
+    echo "Check logs using: sudo pm2 logs sidorea-api"
     exit 1
 fi
 
@@ -93,123 +136,3 @@ echo "✅ App Setup Completed Successfully!"
 echo "Application Status : ONLINE"
 echo "Application URL    : http://$PUBLIC_IP"
 echo
-
-############################################
-# SSL / HTTPS Configuration
-############################################
-echo "Do you want to configure HTTPS (SSL) for a custom domain?"
-echo "1) Yes"
-echo "2) No"
-read -p "Enter choice (1/2): " SSL_CHOICE
-
-if [ "$SSL_CHOICE" != "1" ]; then
-    echo "Skipping SSL setup. Your app is accessible at http://$PUBLIC_IP"
-    exit 0
-fi
-
-read -p "Enter your domain name (e.g., yourdomain.com): " DOMAIN
-
-# Validate that the user didn't enter an IP address
-if [[ $DOMAIN =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "❌ Error: Only fully qualified domain names are supported for SSL, not IP addresses."
-    exit 1
-fi
-
-read -p "Enter your email address (required for Let's Encrypt certificate renewal notices): " EMAIL
-
-echo
-echo "===================================================="
-echo "Create the following DNS records with your provider:"
-echo "Domain: $DOMAIN"
-echo 
-echo "A Record"
-echo "Host: @ (or leave blank depending on provider)"
-echo "Value: $PUBLIC_IP"
-echo "TTL: Auto"
-echo "-----------------------------"
-echo "A Record"
-echo "Host: www"
-echo "Value: $PUBLIC_IP"
-echo "TTL: Auto"
-echo "===================================================="
-echo
-
-read -p "Type YES and press ENTER after you have updated your DNS records: " DNS_CONFIRM
-
-echo "Waiting for DNS propagation..."
-while true; do
-    echo "Checking..."
-    DOMAIN_IP=$(dig +short "$DOMAIN" | tail -n1)
-    
-    if [ "$DOMAIN_IP" = "$PUBLIC_IP" ]; then
-        echo "✅ DNS propagated successfully!"
-        break
-    else
-        echo "DNS still not updated (Current IP: ${DOMAIN_IP:-None}). Waiting 30 seconds..."
-        sleep 30
-    fi
-done
-
-# Install Nginx if missing
-if ! command -v nginx >/dev/null; then
-    echo "⚙️ Installing Nginx..."
-    sudo apt install nginx -y >/dev/null 2>&1
-fi
-
-# Install Certbot if missing
-if ! command -v certbot >/dev/null; then
-    echo "⚙️ Installing Certbot..."
-    sudo apt install certbot python3-certbot-nginx -y >/dev/null 2>&1
-fi
-
-echo "⚙️ Generating Nginx configuration for $DOMAIN..."
-sudo tee /etc/nginx/sites-available/$DOMAIN >/dev/null <<EOF
-server {
-    listen 80;
-    server_name $DOMAIN www.$DOMAIN;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-    }
-}
-EOF
-
-# Enable the site and remove default
-sudo ln -sf /etc/nginx/sites-available/$DOMAIN /etc/nginx/sites-enabled/$DOMAIN
-sudo rm -f /etc/nginx/sites-enabled/default
-
-# Test Nginx configuration
-echo "🧪 Testing Nginx configuration..."
-if ! sudo nginx -t; then
-    echo "❌ Nginx configuration test failed. Aborting SSL setup."
-    exit 1
-fi
-
-sudo systemctl restart nginx
-
-# Run Certbot non-interactively
-echo "🔒 Requesting SSL Certificate from Let's Encrypt..."
-sudo certbot \
-    --nginx \
-    --non-interactive \
-    --agree-tos \
-    --redirect \
-    --email "$EMAIL" \
-    -d "$DOMAIN" \
-    -d "www.$DOMAIN"
-
-echo
-echo "🎉 SSL Configuration Complete!"
-echo "Your application is now securely available at:"
-echo "👉 https://$DOMAIN"
-echo
-echo "Useful Commands"
-echo "---------------"
-echo "Restart App   : sudo pm2 restart cidr-app"
-echo "App Logs      : sudo pm2 logs cidr-app"
-echo "Restart Nginx : sudo systemctl restart nginx"

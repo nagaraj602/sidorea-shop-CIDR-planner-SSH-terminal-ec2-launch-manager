@@ -13,7 +13,7 @@
     "cidr",
     "ssh",
     "ec2",
-    "sqlite",
+    "postgresql",
     "socketio"
   ],
   "author": "",
@@ -23,7 +23,9 @@
     "express": "^5.1.0",
     "multer": "^2.0.2",
     "socket.io": "^4.8.1",
-    "sqlite3": "^5.1.7",
+    "pg": "^8.11.3",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5",
     "ssh2": "^1.17.0"
   }
 }
