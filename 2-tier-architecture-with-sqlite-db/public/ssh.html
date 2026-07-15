@@ -68,9 +68,8 @@
         .form-label { font-size: 12px; font-weight: bold; color: #64748b; margin-top: 5px; }
 
         /* Styles for disabled form fields to indicate locked state */
-        select:disabled, input:disabled { background-color: var(--bg); cursor: not-allowed; opacity: 0.7; }
+        select:disabled, input:disabled, button:disabled { background-color: var(--bg); cursor: not-allowed; opacity: 0.7; }
     </style>
-    <script src="/navbar.js"></script>
 </head>
 <body>
     <div class="container" style="margin-top: 80px;">
@@ -241,6 +240,7 @@
                     <div style="display: flex; flex:2; align-items: center; gap: 5px;">
                         <span style="font-size:12px; font-weight:bold; color:#64748b; white-space:nowrap;">Key Pair:</span>
                         <select id="prov-aws-key" style="flex:1;" disabled><option value="">⚠️ Select AWS Credential Above</option></select>
+                        <button id="prov-create-key-btn" class="btn" style="padding: 4px 10px; font-size: 16px; font-weight:bold; background:#10b981;" onclick="createNewAwsKey()" title="Create New AWS Key Pair" disabled>+</button>
                     </div>
                 </div>
                 
@@ -367,6 +367,59 @@
             } catch (err) {}
         }
 
+        async function createNewAwsKey() {
+            const credId = document.getElementById('prov-cred').value;
+            const region = document.getElementById('prov-region').value;
+
+            if (!credId || !region) return alert("Please select an AWS Credential and Region first.");
+
+            const keyName = prompt("Enter a name for your new AWS Key Pair (e.g., prod-web-key):");
+            if (!keyName) return;
+
+            const btn = document.getElementById('prov-create-key-btn');
+            btn.innerText = "⏳";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/aws-create-keypair', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, credId, region, keyName })
+                });
+
+                if (res.ok) {
+                    const data = await res.json(); 
+
+                    // Trigger the browser download for the .pem file
+                    const blob = new Blob([data.keyMaterial], { type: 'text/plain' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `${keyName}.pem`; 
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    alert(`✅ Key Pair '${keyName}' created successfully in AWS!\n\nThe private key has been saved to the server and downloaded to your computer.`);
+
+                    await syncAwsRegionData(); // Refresh the AWS dropdown
+                    await loadKeys(); // Refresh the main SSH Terminal keys
+
+                    // Auto-select the newly created key in the dropdown
+                    setTimeout(() => { document.getElementById('prov-aws-key').value = keyName; }, 500);
+                } else {
+                    alert(`❌ Failed to create key: ${await res.text()}`);
+                }
+            } catch (err) {
+                alert(`❌ Network error: ${err.message}`);
+            }
+
+            btn.innerText = "+";
+            btn.disabled = false;
+        }
+
         async function quickSaveSession() {
             if(activeSessions.length === 0) return alert("No active terminals to save.");
             const name = prompt("Enter a name for this session layout:", `Session ${new Date().toLocaleTimeString()}`);
@@ -412,7 +465,6 @@
         async function loadAwsCreds() {
             const res = await fetch(`/api/aws-creds/${user}`); awsCreds = await res.json();
             
-            // FIXED: Explicitly use the string the user set (No AWS Credentials) so it renders perfectly
             const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
             document.getElementById('prov-cred').innerHTML = awsCreds.length ? `<option value="">Select Credential...</option>` + credOptions : '<option value="">No AWS Credentials - Click "+ Add New"</option>';
             
@@ -431,7 +483,7 @@
             const credId = document.getElementById('prov-cred').value;
             const isEnabled = !!credId;
             
-            const fieldsToToggle = ['prov-region', 'prov-os', 'prov-my-amis', 'prov-ami-raw', 'prov-type', 'prov-type-custom', 'prov-sg-mode', 'prov-existing-sgs', 'prov-sg-proto', 'prov-sg-ports', 'prov-storage', 'prov-aws-key'];
+            const fieldsToToggle = ['prov-region', 'prov-os', 'prov-my-amis', 'prov-ami-raw', 'prov-type', 'prov-type-custom', 'prov-sg-mode', 'prov-existing-sgs', 'prov-sg-proto', 'prov-sg-ports', 'prov-storage', 'prov-aws-key', 'prov-create-key-btn'];
             
             fieldsToToggle.forEach(id => {
                 const el = document.getElementById(id);
@@ -876,7 +928,6 @@
 
         function duplicateTerminal(termId) { const session = activeSessions.find(s => s.id === termId); if(session) createTerminal(session.host, session.user, session.keyPath, session.name); }
         
-        // FIXED: The new Upload function uses a terminal 'mv' command to pull the file perfectly into your CURRENT directory
         function triggerUpload(termId) {
             const session = activeSessions.find(s => s.id === termId);
             if (!session) return;
@@ -890,7 +941,6 @@
                 const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
                 const tempPath = `/tmp/up_${Date.now()}_${safeName}`;
                 
-                // Track this specific upload so the terminal knows exactly what to do when SFTP completes
                 session.pendingUpload = safeName;
                 session.pendingTempPath = tempPath;
 
@@ -904,7 +954,6 @@
             input.click();
         }
 
-        // FIXED: The new Download function uses a terminal 'cp' command to push the file perfectly out of your CURRENT directory
         function triggerDownload(termId) {
             const session = activeSessions.find(s => s.id === termId);
             if (!session) return;
@@ -918,14 +967,11 @@
             
             session.term.write(`\r\n\x1b[36m📥 Preparing download for ${fileName}...\x1b[0m\r\n`);
             
-            // Tell the bash shell to copy the file from the user's current directory to the global /tmp folder
             session.socket.emit('terminal-input', ` cp "./${fileName}" ${tempPath}\r`);
             
-            // Give the terminal 1.5 seconds to finish the copy, then trigger the backend SFTP download
             setTimeout(() => {
                 session.socket.emit('sftp-download', tempPath);
                 
-                // Delete the temporary file from the server after a few seconds to keep it clean
                 setTimeout(() => {
                     if (session.socket && session.socket.connected) {
                         session.socket.emit('terminal-input', ` rm -f ${tempPath}\r`);
@@ -948,7 +994,6 @@
                 if (msg.includes('closed') || msg.includes('Disconnected')) { session.term.write(`\r\n\x1b[33m\r\n*** ${msg} ***\x1b[0m\r\n`); }
             });
 
-            // FIXED: Automatically runs the 'mv' command inside the shell to move the file into the exact PWD directory
             session.socket.on('sftp-success', (msg) => { 
                 if (session.pendingTempPath && session.pendingUpload) {
                     session.term.write(`\r\n\x1b[32m${msg}. Finalizing...\x1b[0m\r\n`);
@@ -964,7 +1009,6 @@
                 const blob = new Blob([data.fileData]); const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a'); a.style.display = 'none'; a.href = url; 
                 
-                // Remove our invisible temp tracking prefix so the user just gets their exact file name back
                 let cleanName = data.fileName;
                 if (cleanName.startsWith('dl_')) {
                     cleanName = cleanName.split('_').slice(2).join('_');
