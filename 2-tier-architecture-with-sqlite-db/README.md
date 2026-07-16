@@ -1,38 +1,70 @@
-# sidorea-shop-CIDR-planner-SSH-terminal-ec2-launch-manager
+# Sidorea - 2-Tier Cloud Manager & SSH Workspace
 
-A comprehensive, all-in-one web platform designed for **DevOps Beginners**. This application provides a unified dashboard to calculate CIDR, connect to servers via a fully featured web-based SSH terminal, design AWS VPC architectures, and manage AWS EC2 instances dynamically.
+A lightweight, streamlined **2-tier web platform** designed for DevOps engineers and cloud administrators.
 
-Built with **Node.js, Express, Socket.io, SQLite, Terraform, and the AWS SDK**.
+This application provides a unified dashboard to:
+
+- Calculate CIDR ranges
+- Connect to Linux servers using a web-based SSH terminal
+- Design AWS VPC architectures visually
+- Manage AWS EC2 instances dynamically
+
+This repository contains the **2-Tier Architecture** version of the application. It runs as a **monolithic Node.js application** that serves both the frontend and backend, while using a local **SQLite** database for maximum simplicity and portability.
 
 ---
 
 # 📑 Table of Contents
 
-- [Overview](#overview)
+- [Architecture Overview](#-architecture-overview)
 - [Key Features](#-key-features)
 - [Prerequisites](#-prerequisites)
-- [Installation](#-installation)
-- [Running the Script](#-running-the-script)
-- [Manual Method](#-manual-method)
-- [Starting the Application](#-starting-the-application)
-- [Useful PM2 Commands](#-useful-pm2-commands)
+- [Bare Metal Installation (PM2)](#-bare-metal-installation-pm2)
+- [Docker Deployment](#-docker-deployment)
+- [Kubernetes Deployment](#-kubernetes-deployment)
 - [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
 - [Security Notice](#-security-notice)
 
 ---
 
-# Overview
+# 🏗️ Architecture Overview
 
-This platform combines multiple DevOps utilities into a single web application.
+The application follows a **2-tier architecture**, making it easy to deploy while consuming minimal system resources.
 
-It includes:
+## 1. Application Tier (Node.js & Express)
 
-- Cloud CIDR Calculator
-- Browser-based SSH Terminal
-- AWS EC2 Launch & Management
-- AWS VPC Visual Designer
-- Terraform Code Generator
-- AWS Infrastructure Reference Studio
+- Runs on **Port 3000**
+- Serves both the frontend and backend from a single Node.js process
+
+Responsibilities include:
+
+- Serving HTML, CSS and JavaScript
+- Executing Terraform workspaces
+- Creating WebSocket SSH tunnels using `ssh2`
+- Communicating with AWS SDK
+- Managing SSH sessions
+- Handling AWS resource provisioning
+
+---
+
+## 2. Data Tier (SQLite)
+
+A lightweight **SQLite** database stores all application data locally.
+
+Database location:
+
+```
+/data/app_data.db
+```
+
+The database securely stores:
+
+- AWS Credentials
+- Generated SSH `.pem` Keys
+- CIDR Calculation History
+- User Layouts
+- Application Configuration
+
+Unlike the 3-tier version, **no external PostgreSQL server is required**.
 
 ---
 
@@ -40,46 +72,68 @@ It includes:
 
 ## 🌐 Web SSH & AWS Instance Manager (`/ssh`)
 
-- Connect to multiple Linux servers simultaneously.
-- Side-by-side split terminal view.
-- Infinite horizontal scrolling.
-- Live Sparkline Metrics
-  - CPU
-  - Memory
-  - Disk Usage
+### SSH Features
+
+- Multiple SSH sessions simultaneously
+- Split-screen terminals
+- Horizontal scrolling
+- Fully interactive terminal
+
+### Live Monitoring
+
+- CPU Usage
+- Memory Usage
+- Disk Usage
+
+### File Transfer
+
 - One-click SFTP Upload
 - One-click SFTP Download
-- Native AWS EC2 Controls
-  - Start
-  - Stop
-  - Reboot
-  - Terminate
-- Dynamic EC2 Provisioning using Terraform workspaces.
-- Automatically retrieves:
-  - Region-specific AMIs
-  - Security Groups
-  - Key Pairs
+
+### Native AWS Controls
+
+- Start EC2
+- Stop EC2
+- Reboot EC2
+- Terminate EC2
+
+### Terraform Integration
+
+- Dynamic EC2 provisioning
+- Native Terraform workspaces
+- Automatic state management
+
+### Automatic AWS Discovery
+
+Automatically retrieves:
+
+- Region-specific AMIs
+- Security Groups
+- Key Pairs
+
+### Dynamic AWS Key Generation
+
+Generate `.pem` keys directly from the browser.
+
+The application automatically:
+
+- Downloads the key to your computer
+- Stores a secure copy locally for future use
 
 ---
 
-## 🧮 Cloud CIDR Calculator (`/app`)
+## 🧮 Cloud CIDR Calculator
 
-- Calculate AWS-compatible CIDR ranges.
-- Create valid subnet layouts.
-- View:
-  - Total IP addresses
-  - Usable IP addresses
-  - AWS Reserved IPs
-  - Network Address
-  - Broadcast Address
-- Save network designs locally.
-- Restore previously saved architectures.
+- AWS-compatible CIDR calculations
+- Automatic subnet generation
+- Network planning
+- Address validation
 
 ---
 
-## 🏗️ AWS VPC Builder (`/vpc`)
+## 🏗️ AWS VPC Builder
 
-Design AWS architectures visually.
+Design AWS infrastructure visually.
 
 Supported resources include:
 
@@ -89,304 +143,188 @@ Supported resources include:
 - EC2 Instances
 - Security Groups
 
-Automatically generates production-ready Terraform (`main.tf`) configuration from the visual topology.
-
----
-
-## 📚 Infrastructure Studios (`/ec2` & `/storage`)
-
-Quick reference dashboards for:
-
-- AWS Storage Services
-- EBS Volume Types
-- Performance Limits
-- Throughput Comparisons
-- Linux Mount Commands
-- Formatting Runbooks
+Automatically generate production-ready Terraform (`main.tf`) configuration from the visual topology.
 
 ---
 
 # 📋 Prerequisites
 
-Before installing the application, ensure your server meets the following requirements.
+Ensure your environment meets the following requirements:
 
 - Ubuntu/Debian Linux (Recommended)
-- Node.js 18 or later
+- Node.js 18+
 - npm
 - Terraform CLI
-- sudo privileges
+- Docker (Optional)
+- Kubernetes (Optional)
 
 ---
 
-# 🚀 Installation
-You can Either setup everything manually or using script written for it. We have documented both.
+# 🚀 Bare Metal Installation (PM2)
 
-## Running the Script
-The repository includes an automated setup script that installs all required dependencies and prepares the application.
+If you are running the application directly on a Linux server without containers, follow these steps.
 
-```bash
-./script.sh
-```
-OR
-```bash
-bash script.sh
-```
-Once the setup completes successfully, proceed to start the application using PM2.
+## Step 1 — Install Dependencies
 
-# Manual method:
----
-## 1. Update the System
+Navigate to the project directory.
 
 ```bash
-sudo apt update
-sudo apt upgrade -y
-```
+cd 2-tier-architecture-with-sqlite-db
 
----
-
-## 2. Clone the Repository
-
-```bash
-git clone https://github.com/nagaraj602/sidorea-shop-CIDR-planner-SSH-terminal-ec2-launch-manager.git
-
-cd sidorea-shop-CIDR-planner-SSH-terminal-ec2-launch-manager
-```
-
----
-
-## 3. Install Node.js Dependencies
-
-```bash
 npm install
 ```
 
----
-
-## 4. Install Terraform
-
-Skip this step if Terraform is already installed.
-
-```bash
-sudo apt-get update
-sudo apt-get install -y gnupg software-properties-common
-
-wget -O- https://apt.releases.hashicorp.com/gpg \
-| gpg --dearmor \
-| sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
-
-gpg --no-default-keyring \
---keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg \
---fingerprint
-
-echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" \
-| sudo tee /etc/apt/sources.list.d/hashicorp.list
-
-sudo apt update
-
-sudo apt-get install terraform
-```
+SQLite will automatically be installed during dependency installation.
 
 ---
 
-## 5. Install PM2
+## Step 2 — Start the Application
+
+No external database configuration is required.
+
+Install PM2.
 
 ```bash
 sudo npm install -g pm2
 ```
 
----
-
-# ▶️ Starting the Application
-
-Start the application:
+Start the application.
 
 ```bash
-sudo pm2 start server.js --name cidr-app
+pm2 start server.js --name sidorea-app
+
+pm2 save
 ```
 
-Enable automatic startup after server reboot:
-
-```bash
-sudo pm2 startup
-sudo pm2 save
-```
-
-After the application starts, open your browser and navigate to:
+Access the application at:
 
 ```
-http://<Public-IP>
-```
-
-or
-
-```
-http://<Domain-Name>
+http://<Your-Server-IP>:3000
 ```
 
 ---
 
-# 🛠 Useful PM2 Commands
+# 🐳 Docker Deployment
 
-Restart application
+The repository includes an optimized multi-stage Dockerfile.
+
+The image includes:
+
+- SQLite
+- Terraform CLI
+- Node.js Runtime
+
+## Build the Image
 
 ```bash
-sudo pm2 restart cidr-app
+docker build -t sidorea-2tier:latest .
 ```
 
-View logs
+---
+
+## Run the Container
+
+A Docker volume is mounted to preserve:
+
+- SQLite database
+- Terraform workspaces
+- Generated SSH keys
 
 ```bash
-sudo pm2 logs cidr-app
+docker run -d \
+  -p 3000:3000 \
+  -v sidorea_data:/app/data \
+  --name sidorea-app \
+  sidorea-2tier:latest
 ```
 
-Stop application
+---
+
+# ☸️ Kubernetes Deployment
+
+A complete Kubernetes manifest (`k8s-manifest.yaml`) is included.
+
+Since the application depends on local SQLite storage and locally generated SSH keys, it uses a **StatefulSet** instead of a Deployment to guarantee persistent storage.
+
+Resources created include:
+
+- ConfigMap
+- PersistentVolumeClaim (5Gi)
+- StatefulSet
+- NodePort Service (30080)
+
+Deploy everything:
 
 ```bash
-sudo pm2 stop cidr-app
+kubectl apply -f k8s-manifest.yaml
 ```
 
-Check status
+Access the application at:
 
-```bash
-sudo pm2 status
 ```
-
-Delete application
-
-```bash
-sudo pm2 delete cidr-app
+http://<Node-IP>:30080
 ```
 
 ---
 
 # 🔒 Enable HTTPS with Nginx & Certbot
 
-By default, the application runs directly on **Port 80**.
-
-For production deployments, it is recommended to place **Nginx** in front of the Node.js application as a reverse proxy and use **Let's Encrypt** with **Certbot** to automatically generate and renew SSL certificates.
-You can ignore this, if you have used script.sh file to setup this things.
-
----
-
-## Step 1 — Install Nginx and Certbot
+For Bare Metal or Docker deployments, use the included SSL installation script.
 
 ```bash
-sudo apt install nginx certbot python3-certbot-nginx -y
+sudo bash SSL-install-script.sh
 ```
 
----
+The script automatically:
 
-## Step 2 — Configure Nginx Reverse Proxy
+1. Installs Nginx
+2. Installs Certbot
+3. Prompts for your domain name
+4. Verifies DNS propagation
+5. Generates Let's Encrypt SSL certificates
+6. Configures Nginx as a reverse proxy
 
-Create a new Nginx configuration file:
+Routing:
 
-```bash
-sudo vi /etc/nginx/sites-available/sidorea
-```
+| Path | Destination |
+|------|-------------|
+| `/` | Node.js Application (Port 3000) |
+| `/socket.io/` | Node.js Application (Port 3000) |
 
-Paste the following configuration:
-
-```nginx
-server {
-    listen 80;
-    server_name sidorea.shop www.sidorea.shop;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-Enable the configuration:
-
-```bash
-sudo ln -s /etc/nginx/sites-available/sidorea /etc/nginx/sites-enabled/
-```
-
-Test the configuration:
-
-```bash
-sudo nginx -t
-```
-
-Restart Nginx:
-
-```bash
-sudo systemctl restart nginx
-```
-
----
-
-## Step 3 — Verify Route 53 Configuration
-
-Ensure your Route 53 Hosted Zone contains an **A Record** pointing to your EC2 instance's **Public IPv4 Address**.
-
-Example:
-
-| Record | Value |
-|---------|-------|
-| sidorea.shop | EC2 Public IPv4 |
-| www.sidorea.shop | EC2 Public IPv4 |
-
----
-
-## Step 4 — Generate the SSL Certificate
-
-Run:
-
-```bash
-sudo certbot --nginx -d sidorea.shop -d www.sidorea.shop
-```
-
-Certbot will:
-
-- Validate your domain.
-- Download a free Let's Encrypt certificate.
-- Configure Nginx automatically.
-- Enable automatic certificate renewal.
-
-When prompted whether to redirect HTTP to HTTPS, choose:
-
-```
-Option 2
-Redirect all HTTP traffic to HTTPS
-```
-
-After completion, your application will be securely available at:
-
-```
-https://sidorea.shop
-```
-
-The Web SSH Terminal, Socket.io connections, and Terraform provisioning features will continue functioning correctly behind the secure Nginx reverse proxy.
+> **Note**
+>
+> If deploying on Kubernetes, ignore this script and instead configure **cert-manager** with an Ingress resource.
 
 ---
 
 # ⚠️ Security Notice
 
-This project is intended for:
+This application acts as a central control plane for AWS and SSH infrastructure.
 
-- Learning
-- Personal Labs
-- Sandbox Environments
-- DevOps Practice
+Before deploying to production:
 
-Before exposing it to the public internet, consider implementing:
+- Never expose the application to the public Internet without HTTPS.
+- AWS Access Keys are stored in the local SQLite database.
+- SSH Private Keys are stored in the local file system.
+- Implement user authentication (OAuth/JWT).
+- Enable Role-Based Access Control (RBAC).
+- Restrict access using IP whitelisting.
+- Follow the Principle of Least Privilege for all AWS IAM credentials.
 
-- HTTPS (SSL/TLS)
-- User Authentication (OAuth/JWT)
-- Role-Based Access Control (RBAC)
-- Secure Secret Management
-- IAM Least-Privilege Policies
-- Database Encryption
-- Firewall Rules
-- Rate Limiting
+---
 
-> **Important:** The application stores AWS credentials and SSH private keys in a local SQLite database (`app_data.db`). Never deploy this application publicly without implementing proper authentication, encryption, and access controls.
+# 📄 License
+
+Add your preferred license here.
+
+Example:
+
+```
+MIT License
+```
+
+---
+
+# 👨‍💻 Author
+
+Developed by **Sidorea**.
