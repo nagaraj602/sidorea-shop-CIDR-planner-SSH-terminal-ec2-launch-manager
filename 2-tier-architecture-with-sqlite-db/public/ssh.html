@@ -545,7 +545,7 @@
                     const data = await res.json();
                     
                     document.getElementById('prov-aws-key').innerHTML = data.keyPairs.length ? 
-                        data.keyPairs.map(k => `<option value="${k}">${k}</option>`).join('') : '<option value="">No keys found in this region</option>';
+                        data.keyPairs.map(k => `<option value="${k}">${k.replace(/\.pem$/i, '')}</option>`).join('') : '<option value="">No keys found in this region</option>';
                     
                     document.getElementById('prov-existing-sgs').innerHTML = data.securityGroups.length ? 
                         data.securityGroups.map(sg => `<option value="${sg.id}">${sg.name} (${sg.id})</option>`).join('') : '<option value="">No Default VPC groups found</option>';
