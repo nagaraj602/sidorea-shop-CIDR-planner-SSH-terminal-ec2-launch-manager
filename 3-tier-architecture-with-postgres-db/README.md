@@ -171,7 +171,7 @@ You can either install using the manual setup shown below or else, you just run 
 ```
 bash script.sh
 ```
-##Manual Method:
+## Manual Method:
 ## Step 1 — Configure PostgreSQL
 
 Create the database and user.
