@@ -33,8 +33,10 @@
         .workspace { display: flex; gap: 20px; height: 95vh; width: 100%; box-sizing: border-box;}
         .workspace.horizontal { overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; align-items: stretch; padding-bottom: 15px; scroll-behavior: smooth; }
         .workspace.horizontal .terminal-wrapper { flex: 0 0 1200px; max-width: 95vw; box-sizing: border-box; }
-        .workspace.split { flex-wrap: nowrap; overflow: hidden; justify-content: space-between; width: 100%; }
-        .workspace.split .terminal-wrapper { flex: 0 0 calc(50% - 10px); width: calc(50% - 10px); box-sizing: border-box; overflow: hidden; }
+        
+        /* Fixed Split View Rules */
+        .workspace.split { display: flex; flex-wrap: nowrap; overflow: hidden; justify-content: flex-start; width: 100%; max-width: 100%; gap: 20px; padding-bottom: 0; }
+        .workspace.split .terminal-wrapper { flex: 1 1 0; min-width: 0; width: calc(50% - 10px); max-width: calc(50% - 10px); box-sizing: border-box; overflow: hidden; }
         
         .terminal-wrapper { background: #0b0f19; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; border: 1px solid #1e293b; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); transition: transform 0.2s ease-in-out;}
         .terminal-header { color: #fff; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-family: monospace; border-bottom: 1px solid #334155; padding-bottom: 8px; font-size: 14px; font-weight: bold;}
@@ -388,10 +390,20 @@
             if(!alias || !accessKey || !secretKey) return alert("Please fill all AWS credential fields.");
             
             try {
+                // Sending BOTH standard formats to guarantee the backend database maps it successfully
+                const payload = {
+                    username: user, 
+                    alias: alias, 
+                    accessKey: accessKey, 
+                    secretKey: secretKey,
+                    access_key: accessKey,
+                    secret_key: secretKey
+                };
+
                 const res = await fetch('/api/aws-creds', {
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: user, alias, accessKey, secretKey})
+                    body: JSON.stringify(payload)
                 });
                 
                 if(res.ok) {
@@ -400,7 +412,7 @@
                     document.getElementById('aws-secret').value = '';
                     closeModal('aws-modal');
                     await loadAwsCreds();
-                    alert("✅ AWS Credentials saved successfully!");
+                    alert("✅ AWS Credentials saved successfully!\n\nIMPORTANT: Please open 'Manage Data' and delete any old/broken credentials.");
                 } else {
                     alert(`❌ Failed to save credentials: ${await res.text()}`);
                 }
@@ -533,13 +545,13 @@
                 if (!res.ok) throw new Error("API failed");
                 awsCreds = await res.json();
                 
-                const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id || c.cred_id || c.credId}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
+                const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id || c.cred_id}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
                 document.getElementById('prov-cred').innerHTML = awsCreds.length ? `<option value="">Select Credential...</option>` + credOptions : '<option value="">No AWS Credentials - Click "+ Add New"</option>';
                 
                 document.querySelectorAll('select[id^="power-cred-"]').forEach(select => {
                     const currentVal = select.value;
                     select.innerHTML = credOptions;
-                    if (currentVal && awsCreds.find(c => (c.id || c.cred_id || c.credId) == currentVal)) {
+                    if (currentVal && awsCreds.find(c => (c.id || c.cred_id) == currentVal)) {
                         select.value = currentVal;
                     }
                 });
@@ -1230,14 +1242,13 @@
         async function deleteHistory(index) { sessionHistory.splice(index, 1); await syncToServer(); openHistoryModal(); }
 
         function openManageModal() {
-            const safeAwsList = awsCreds.length ? awsCreds.map(c => {
-                const idVal = c.id || c.cred_id || c.credId || "null";
-                const keyVal = c.access_key || c.accessKey || c.aws_access_key_id || "";
-                const displayKey = keyVal ? keyVal.substring(0, 6) : "Invalid";
+            document.getElementById('manage-aws-list').innerHTML = awsCreds.length ? awsCreds.map(c => {
+                const rawKey = c.access_key || c.accessKey || "ERROR_BLANK";
+                const displayKey = rawKey.length > 5 ? rawKey.substring(0,6) : rawKey;
+                const idVal = c.id || c.cred_id || "null";
                 return `<li>${c.alias} [${displayKey}...] <button class="manage-del-btn" onclick="deleteAwsCredsFromManage(${idVal})">Delete</button></li>`;
             }).join('') : '<li>No AWS Credentials saved.</li>';
-
-            document.getElementById('manage-aws-list').innerHTML = safeAwsList;
+            
             document.getElementById('manage-hosts-list').innerHTML = knownHosts.map((h, i) => `<li>${h} <button class="manage-del-btn" onclick="deleteData('host', ${i})">Delete</button></li>`).join('');
             document.getElementById('manage-users-list').innerHTML = knownUsernames.map((u, i) => `<li>${u} ${defaultUsers.includes(u) ? '<span style="color:#94a3b8; font-size:12px;">(Default)</span>' : `<button class="manage-del-btn" onclick="deleteData('user', ${i})">Delete</button>`}</li>`).join('');
             document.getElementById('manage-keys-list').innerHTML = serverKeys.map(k => `<li>${k.key_name} <button class="manage-del-btn" onclick="deleteKey(${k.id})">Delete</button></li>`).join('');
