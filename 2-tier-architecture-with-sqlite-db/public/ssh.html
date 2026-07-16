@@ -963,10 +963,9 @@
 
             // MobaXterm-Style: Right-click to paste
             document.getElementById(termId).addEventListener('contextmenu', async (e) => {
-                e.preventDefault(); // Hide the browser's default menu
-                
-                // If on HTTPS (SSL), we can paste automatically just like MobaXterm!
+                // 1. If on HTTPS (SSL): Intercept right-click, hide menu, and auto-paste
                 if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
+                    e.preventDefault(); // Hide the browser's default menu
                     try {
                         const text = await navigator.clipboard.readText();
                         if (text && sessionData.socket) { 
@@ -976,13 +975,13 @@
                     } catch (err) {
                         alert("⚠️ Clipboard access denied. Please allow clipboard permissions in your browser's URL bar.");
                     }
-                } else {
-                    // If on HTTP, alert the user about the browser restriction.
-                    alert("⚠️ Right-click pasting requires HTTPS (SSL).\n\nBecause you are on an IP address (HTTP), browser security blocks JavaScript from reading your clipboard.\n\nPlease use Ctrl+V or Shift+Insert to paste.");
+                    setTimeout(() => term.focus(), 10);
+                } 
+                // 2. If on HTTP: Do NOT prevent default. Allow the native browser menu to pop up.
+                else {
+                    // Make sure the terminal is focused so when you click "Paste" from the menu, it goes into the terminal
+                    term.focus(); 
                 }
-                
-                // Reclaim cursor focus
-                setTimeout(() => term.focus(), 10);
             });
 
             const socket = io();
