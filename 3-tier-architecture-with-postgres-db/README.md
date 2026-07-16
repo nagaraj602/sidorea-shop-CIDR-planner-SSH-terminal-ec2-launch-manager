@@ -232,8 +232,7 @@ pm2 save
 Ensure Frontend points to the backend API running on Port **3000**.
 You can just try accessing the app at: http://<public_IP>:3000
 
-For accessing the app without specifying the port number 3000, you can setup reverse proxy with the help of nginx. To do that, Click here: 
-- [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
+
 ---
 
 # 🐳 Docker Deployment
