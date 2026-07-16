@@ -1,93 +1,3 @@
-#!/bin/bash
-
-# This script is to install everything on your bare metal server and make the app up without using docker or Kubernetes. App backend uses port 3000 but nginx will reverse proxy it and app runs on port 80 (HTTP) or 443 (HTTPS)
-
-# Detect Linux Distribution
-distro=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
-
-case "$distro" in
-    ubuntu)
-        echo "Detected Ubuntu Distro."
-        ;;
-    debian)
-        echo "Detected Debian Distro."
-        ;;
-    *)
-        echo "Unsupported Linux Distribution: $distro. You can have only Ubuntu and Debian"
-        exit 1
-        ;;
-esac
-
-# Update System
-echo "🚀 Starting System Update..."
-sudo apt-get update >/dev/null 2>&1
-sudo apt-get upgrade -y >/dev/null 2>&1
-
-# Install Required Packages
-echo "📦 Installing Required Packages..."
-sudo apt install postgresql postgresql-contrib nodejs npm nginx curl wget gnupg software-properties-common ca-certificates apt-transport-https dnsutils -y >/dev/null 2>&1
-
-############################################
-# Install Terraform
-############################################
-echo "🏗️ Installing Terraform..."
-if ! command -v terraform >/dev/null; then
-    curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg >/dev/null 2>&1
-    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null 2>&1
-    sudo apt-get update >/dev/null 2>&1
-    sudo apt-get install -y terraform >/dev/null 2>&1
-else
-    echo "Terraform already installed."
-fi
-
-############################################
-# Configure PostgreSQL
-############################################
-echo "🗄️ Configuring Database..."
-sudo systemctl enable postgresql
-sudo systemctl start postgresql
-
-sudo -i -u postgres psql -c "CREATE DATABASE sidorea_db;"
-sudo -i -u postgres psql -c "CREATE USER sidorea_user WITH ENCRYPTED PASSWORD 'supersecurepassword';"
-sudo -i -u postgres psql -c "ALTER DATABASE sidorea_db OWNER TO sidorea_user;"
-
-############################################
-# Install PM2
-############################################
-echo "⚙️ Installing PM2..."
-if ! command -v pm2 >/dev/null 2>&1; then
-    sudo npm install -g pm2 >/dev/null 2>&1
-else
-    echo "PM2 already installed."
-fi
-
-############################################
-# Configure and Start Backend
-############################################
-echo "📥 Installing Project Dependencies..."
-cd backend_api
-
-cat << 'EOF' > .env
-PORT=3000
-DB_USER=sidorea_user
-DB_PASSWORD=supersecurepassword
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=sidorea_db
-EOF
-
-npm install >/dev/null 2>&1
-
-echo "🚀 Starting Application..."
-if sudo pm2 describe sidorea-api >/dev/null 2>&1; then
-    sudo pm2 restart sidorea-api >/dev/null 2>&1
-else
-    sudo pm2 start server.js --name sidorea-api >/dev/null 2>&1
-fi
-
-sudo pm2 save >/dev/null 2>&1
-cd ..
-
 ############################################
 # SSL / HTTPS Configuration & Nginx Routing
 ############################################
@@ -105,13 +15,36 @@ read -p "Enter choice (1/2): " SSL_CHOICE
 # Fix permissions so Nginx can read the directory regardless of choice
 sudo chmod 755 /home/ubuntu
 
+# ---------------------------------------------------------
+# STAGE 1: Domain Validation & Escape Hatch
+# ---------------------------------------------------------
 if [ "$SSL_CHOICE" == "1" ]; then
-    read -p "Enter your domain name (e.g., yourdomain.com): " DOMAIN
+    
+    while true; do
+        read -p "Enter your domain name (or type 'cancel' to skip): " DOMAIN
 
-    if [[ $DOMAIN =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "❌ Error: Only fully qualified domain names are supported for SSL, not IP addresses."
-        exit 1
-    fi
+        # Convert input to lowercase to catch "Cancel", "CANCEL", etc.
+        if [[ "${DOMAIN,,}" == "cancel" ]]; then
+            echo "⚠️  Cancelling SSL setup. Falling back to HTTP / Local IP configuration..."
+            SSL_CHOICE="2" # Flip the choice to NO
+            break
+        elif [[ $DOMAIN =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: You entered an IP address ($DOMAIN). Let's Encrypt requires a fully qualified domain name."
+            echo "💡 If you do not have a domain, type 'cancel' to proceed with standard HTTP."
+            echo
+        elif [ -z "$DOMAIN" ]; then
+            echo "❌ Error: Domain cannot be empty. Please try again."
+            echo
+        else
+            break # Valid domain entered, proceed normally
+        fi
+    done
+fi
+
+# ---------------------------------------------------------
+# STAGE 2: Execute Nginx Configuration
+# ---------------------------------------------------------
+if [ "$SSL_CHOICE" == "1" ]; then
 
     read -p "Enter your email address (required for Let's Encrypt): " EMAIL
 
@@ -143,7 +76,6 @@ if [ "$SSL_CHOICE" == "1" ]; then
     sudo apt install certbot python3-certbot-nginx -y >/dev/null 2>&1
 
     echo "🌐 Configuring Nginx for $DOMAIN..."
-    # Note: Variables like $uri and $host are escaped with slashes so Bash doesn't evaluate them
     sudo tee /etc/nginx/sites-available/sidorea > /dev/null << EOF
 server {
     listen 80;
@@ -214,7 +146,7 @@ if ! sudo nginx -t; then
 fi
 sudo systemctl restart nginx
 
-# Run Certbot if SSL was selected
+# Run Certbot if SSL was ultimately selected
 if [ "$SSL_CHOICE" == "1" ]; then
     echo "🔒 Requesting SSL Certificate from Let's Encrypt..."
     sudo certbot \
