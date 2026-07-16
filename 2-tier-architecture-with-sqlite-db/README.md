@@ -161,7 +161,11 @@ Ensure your environment meets the following requirements:
 ---
 
 # 🚀 Bare Metal Installation (PM2)
-
+You can either install using the manual setup shown below or else, you just run the script and it will handle everything:
+```
+bash script.sh
+```
+## Manual Method:
 If you are running the application directly on a Linux server without containers, follow these steps.
 
 ## Step 1 — Install Dependencies
