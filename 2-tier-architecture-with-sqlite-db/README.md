@@ -206,7 +206,8 @@ Access the application at:
 http://<Your-Server-IP>:3000
 ```
 
-For accessing the app without specifying the port number 3000, follow here: - [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
+For accessing the app without specifying the port number 3000, click here: 
+- [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
 ---
 
 
