@@ -167,7 +167,11 @@ Ensure your environment has the following:
 ---
 
 # 🚀 Bare Metal Installation (PM2)
-
+You can either install using the manual setup shown below or else, you just run the script and it will handle everything:
+```
+bash script.sh
+```
+##Manual Method:
 ## Step 1 — Configure PostgreSQL
 
 Create the database and user.
