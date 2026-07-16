@@ -533,13 +533,13 @@
                 if (!res.ok) throw new Error("API failed");
                 awsCreds = await res.json();
                 
-                const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
+                const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id || c.cred_id || c.credId}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
                 document.getElementById('prov-cred').innerHTML = awsCreds.length ? `<option value="">Select Credential...</option>` + credOptions : '<option value="">No AWS Credentials - Click "+ Add New"</option>';
                 
                 document.querySelectorAll('select[id^="power-cred-"]').forEach(select => {
                     const currentVal = select.value;
                     select.innerHTML = credOptions;
-                    if (currentVal && awsCreds.find(c => c.id == currentVal)) {
+                    if (currentVal && awsCreds.find(c => (c.id || c.cred_id || c.credId) == currentVal)) {
                         select.value = currentVal;
                     }
                 });
@@ -842,7 +842,7 @@
             wrapper.className = 'terminal-wrapper'; wrapper.id = `wrapper-${termId}`; wrapper.style.order = activeSessions.length; 
             
             // FIXED: Using identical fallback check for cred generation mapping
-            const awsCredOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : `<option value="">No AWS Credentials</option>`;
+            const awsCredOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id || c.cred_id || c.credId}">${c.alias}</option>`).join('') : `<option value="">No AWS Credentials</option>`;
             
             const activeRegionOptions = awsRegionOptions.replace(`value="${activeRegion}"`, `value="${activeRegion}" selected`);
 
@@ -1230,7 +1230,14 @@
         async function deleteHistory(index) { sessionHistory.splice(index, 1); await syncToServer(); openHistoryModal(); }
 
         function openManageModal() {
-            document.getElementById('manage-aws-list').innerHTML = awsCreds.length ? awsCreds.map(c => `<li>${c.alias} [${c.access_key.substring(0,6)}...] <button class="manage-del-btn" onclick="deleteAwsCredsFromManage(${c.id})">Delete</button></li>`).join('') : '<li>No AWS Credentials saved.</li>';
+            const safeAwsList = awsCreds.length ? awsCreds.map(c => {
+                const idVal = c.id || c.cred_id || c.credId || "null";
+                const keyVal = c.access_key || c.accessKey || c.aws_access_key_id || "";
+                const displayKey = keyVal ? keyVal.substring(0, 6) : "Invalid";
+                return `<li>${c.alias} [${displayKey}...] <button class="manage-del-btn" onclick="deleteAwsCredsFromManage(${idVal})">Delete</button></li>`;
+            }).join('') : '<li>No AWS Credentials saved.</li>';
+
+            document.getElementById('manage-aws-list').innerHTML = safeAwsList;
             document.getElementById('manage-hosts-list').innerHTML = knownHosts.map((h, i) => `<li>${h} <button class="manage-del-btn" onclick="deleteData('host', ${i})">Delete</button></li>`).join('');
             document.getElementById('manage-users-list').innerHTML = knownUsernames.map((u, i) => `<li>${u} ${defaultUsers.includes(u) ? '<span style="color:#94a3b8; font-size:12px;">(Default)</span>' : `<button class="manage-del-btn" onclick="deleteData('user', ${i})">Delete</button>`}</li>`).join('');
             document.getElementById('manage-keys-list').innerHTML = serverKeys.map(k => `<li>${k.key_name} <button class="manage-del-btn" onclick="deleteKey(${k.id})">Delete</button></li>`).join('');
