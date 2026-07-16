@@ -339,14 +339,28 @@
             <option value="sa-east-1">sa-east-1 (São Paulo)</option>
         `;
 
+        // FULLY REFACTORED TO PREVENT CASCADING FAILURES
         async function initData() {
+            // 1. Fetch Session Data
             try {
-                const res = await fetch(`/api/ssh-data/${user}`); const data = await res.json();
-                knownHosts = data.hosts || []; sessionHistory = data.history || []; knownUsernames = [...new Set([...defaultUsers, ...(data.usernames || [])])];
-                document.getElementById('ssh-users-list').innerHTML = knownUsernames.map(u => `<option value="${u}">`).join('');
-                document.getElementById('ssh-hosts-list').innerHTML = knownHosts.map(h => `<option value="${h}">`).join('');
-                await loadKeys(); await loadAwsCreds(); await loadAwsSgs();
+                const res = await fetch(`/api/ssh-data/${user}`); 
+                if (res.ok) {
+                    const data = await res.json();
+                    knownHosts = data.hosts || []; 
+                    sessionHistory = data.history || []; 
+                    knownUsernames = [...new Set([...defaultUsers, ...(data.usernames || [])])];
+                    document.getElementById('ssh-users-list').innerHTML = knownUsernames.map(u => `<option value="${u}">`).join('');
+                    document.getElementById('ssh-hosts-list').innerHTML = knownHosts.map(h => `<option value="${h}">`).join('');
+                }
+            } catch (err) { console.warn("SSH Data fetch failed", err); }
 
+            // 2. Fetch Keys, Creds, and SGs independently
+            await loadKeys(); 
+            await loadAwsCreds(); 
+            await loadAwsSgs();
+
+            // 3. Restore Workspace 
+            try {
                 const localWorkspace = localStorage.getItem('cidr_workspace_' + user);
                 if (localWorkspace) {
                     const savedSessions = JSON.parse(localWorkspace);
@@ -363,8 +377,7 @@
                         setLayout('horizontal');
                     }
                 }
-
-            } catch (err) {}
+            } catch (err) { console.warn("Workspace restore failed", err); }
         }
 
         async function createNewAwsKey() {
@@ -469,20 +482,37 @@
         }
         
         async function loadAwsCreds() {
-            const res = await fetch(`/api/aws-creds/${user}`); awsCreds = await res.json();
-            
-            const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
-            document.getElementById('prov-cred').innerHTML = awsCreds.length ? `<option value="">Select Credential...</option>` + credOptions : '<option value="">No AWS Credentials - Click "+ Add New"</option>';
-            
-            document.querySelectorAll('select[id^="power-cred-"]').forEach(select => {
-                const currentVal = select.value;
-                select.innerHTML = credOptions;
-                if (currentVal && awsCreds.find(c => c.id == currentVal)) {
-                    select.value = currentVal;
-                }
-            });
+            try {
+                const res = await fetch(`/api/aws-creds/${user}`); 
+                if (!res.ok) throw new Error("API failed");
+                awsCreds = await res.json();
+                
+                const credOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : '<option value="">No AWS Credentials</option>';
+                document.getElementById('prov-cred').innerHTML = awsCreds.length ? `<option value="">Select Credential...</option>` + credOptions : '<option value="">No AWS Credentials - Click "+ Add New"</option>';
+                
+                document.querySelectorAll('select[id^="power-cred-"]').forEach(select => {
+                    const currentVal = select.value;
+                    select.innerHTML = credOptions;
+                    if (currentVal && awsCreds.find(c => c.id == currentVal)) {
+                        select.value = currentVal;
+                    }
+                });
 
-            handleCredSelectionChange();
+                handleCredSelectionChange();
+            } catch (e) {
+                document.getElementById('prov-cred').innerHTML = '<option value="">Failed to load credentials</option>';
+            }
+        }
+
+        async function loadKeys() { 
+            try {
+                const res = await fetch(`/api/keys/${user}`); 
+                if (!res.ok) throw new Error("API failed");
+                serverKeys = await res.json(); 
+                document.getElementById('ssh-key-dropdown').innerHTML = serverKeys.length ? serverKeys.map(k => `<option value="${k.file_path}">${k.key_name}</option>`).join('') : '<option value="">No keys saved</option>'; 
+            } catch (e) {
+                document.getElementById('ssh-key-dropdown').innerHTML = '<option value="">Failed to load keys</option>';
+            }
         }
 
         function handleCredSelectionChange() {
@@ -513,8 +543,13 @@
         }
 
         async function loadAwsSgs() {
-            const res = await fetch(`/api/aws-sgs/${user}`); savedSgs = await res.json();
-            updateSgDropdown();
+            try {
+                const res = await fetch(`/api/aws-sgs/${user}`); 
+                if(res.ok) {
+                    savedSgs = await res.json();
+                    updateSgDropdown();
+                }
+            } catch(e) {}
         }
 
         function updateSgDropdown() {
@@ -646,7 +681,26 @@
                 if (res.ok) {
                     const data = await res.json();
                     document.getElementById('provision-status').innerText = `✅ Launch complete!\nIP resolved: ${data.ip}`;
+                    
+                    // ============================================
+                    // Auto-load IP and Key Pair to Workspace
+                    // ============================================
                     document.getElementById('ssh-host').value = data.ip; 
+                    
+                    if (awsKeyName) {
+                        await loadKeys(); // Refresh vault to catch newly generated keys
+                        const cleanTarget = awsKeyName.replace(/\.(pem|ppk|key)$/i, '');
+                        
+                        const savedKey = serverKeys.find(k => 
+                            k.key_name === awsKeyName || 
+                            k.key_name === cleanTarget || 
+                            k.key_name.replace(/\.(pem|ppk|key)$/i, '') === cleanTarget
+                        );
+                        
+                        if (savedKey) {
+                            document.getElementById('ssh-key-dropdown').value = savedKey.file_path;
+                        }
+                    }
                     
                     if (cancelBtn) {
                         cancelBtn.innerText = 'OK';
