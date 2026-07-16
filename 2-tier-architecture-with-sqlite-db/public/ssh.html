@@ -941,7 +941,7 @@
                 if (selection) {
                     try {
                         if (navigator.clipboard && window.isSecureContext) {
-                            navigator.clipboard.writeText(selection);
+                            navigator.clipboard.writeText(selection).catch(()=>{});
                         } else {
                             // Fallback for standard HTTP connections
                             const textArea = document.createElement("textarea");
@@ -952,8 +952,11 @@
                             textArea.select();
                             document.execCommand('copy');
                             document.body.removeChild(textArea);
+                            
+                            // CRITICAL FIX: Restore focus back to the terminal so Ctrl+V works!
+                            term.focus();
                         }
-                    } catch (err) { console.warn("Auto-copy failed", err); }
+                    } catch (err) {}
                 }
             });
 
@@ -961,17 +964,20 @@
             document.getElementById(termId).addEventListener('contextmenu', async (e) => {
                 e.preventDefault(); // Hide the browser's default right-click menu
                 try {
-                    if (navigator.clipboard && navigator.clipboard.readText) {
+                    if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
                         const text = await navigator.clipboard.readText();
                         if (text && sessionData.socket) { 
                             sessionData.socket.emit('terminal-input', text); 
                             term.clearSelection(); 
                         }
                     } else {
-                        // alert("⚠️ Your browser blocks right-click pasting over standard HTTP.\n\nPlease use Ctrl+V (or Cmd+V) to paste, or configure HTTPS/SSL using the bash script to enable right-click pasting.");
+                        alert("⚠️ Your browser blocks right-click pasting over standard HTTP.\n\nPlease use Ctrl+V (or Cmd+V) to paste.");
+                        // Restore focus after the alert closes
+                        term.focus(); 
                     }
                 } catch (err) {
-                    alert("⚠️ Clipboard access denied. Please click the icon next to your URL bar to allow clipboard permissions so you can right-click paste.");
+                    alert("⚠️ Clipboard access denied. Please click the icon next to your URL bar to allow clipboard permissions.");
+                    term.focus();
                 }
             });
 
