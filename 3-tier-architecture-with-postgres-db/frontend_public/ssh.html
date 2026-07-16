@@ -339,9 +339,7 @@
             <option value="sa-east-1">sa-east-1 (São Paulo)</option>
         `;
 
-        // FULLY REFACTORED TO PREVENT CASCADING FAILURES
         async function initData() {
-            // 1. Fetch Session Data
             try {
                 const res = await fetch(`/api/ssh-data/${user}`); 
                 if (res.ok) {
@@ -354,12 +352,10 @@
                 }
             } catch (err) { console.warn("SSH Data fetch failed", err); }
 
-            // 2. Fetch Keys, Creds, and SGs independently
             await loadKeys(); 
             await loadAwsCreds(); 
             await loadAwsSgs();
 
-            // 3. Restore Workspace 
             try {
                 const localWorkspace = localStorage.getItem('cidr_workspace_' + user);
                 if (localWorkspace) {
@@ -378,6 +374,56 @@
                     }
                 }
             } catch (err) { console.warn("Workspace restore failed", err); }
+        }
+
+        function openAwsModal() {
+            document.getElementById('aws-modal').style.display = 'flex';
+        }
+
+        async function saveAwsCreds() {
+            const alias = document.getElementById('aws-alias').value.trim();
+            const accessKey = document.getElementById('aws-key').value.trim();
+            const secretKey = document.getElementById('aws-secret').value.trim();
+            
+            if(!alias || !accessKey || !secretKey) return alert("Please fill all AWS credential fields.");
+            
+            try {
+                const res = await fetch('/api/aws-creds', {
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: user, alias, accessKey, secretKey})
+                });
+                
+                if(res.ok) {
+                    document.getElementById('aws-alias').value = '';
+                    document.getElementById('aws-key').value = '';
+                    document.getElementById('aws-secret').value = '';
+                    closeModal('aws-modal');
+                    await loadAwsCreds();
+                    alert("✅ AWS Credentials saved successfully!");
+                } else {
+                    alert(`❌ Failed to save credentials: ${await res.text()}`);
+                }
+            } catch(e) { 
+                alert(`❌ Network error: ${e.message}`); 
+            }
+        }
+
+        function saveData(type, val) {
+            if (!val) return;
+            if(type === 'host' && !knownHosts.includes(val)) knownHosts.push(val);
+            if(type === 'user' && !knownUsernames.includes(val)) knownUsernames.push(val);
+            syncToServer();
+        }
+
+        async function syncToServer() {
+            const customUsers = knownUsernames.filter(u => !defaultUsers.includes(u));
+            try {
+                await fetch('/api/ssh-data', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: user, hosts: knownHosts, usernames: customUsers, history: sessionHistory})
+                });
+            } catch(e) {}
         }
 
         async function createNewAwsKey() {
@@ -682,13 +728,10 @@
                     const data = await res.json();
                     document.getElementById('provision-status').innerText = `✅ Launch complete!\nIP resolved: ${data.ip}`;
                     
-                    // ============================================
-                    // Auto-load IP and Key Pair to Workspace
-                    // ============================================
                     document.getElementById('ssh-host').value = data.ip; 
                     
                     if (awsKeyName) {
-                        await loadKeys(); // Refresh vault to catch newly generated keys
+                        await loadKeys(); 
                         const cleanTarget = awsKeyName.replace(/\.(pem|ppk|key)$/i, '');
                         
                         const savedKey = serverKeys.find(k => 
@@ -767,7 +810,6 @@
             const keyPath = keyVal || document.getElementById('ssh-key-dropdown').value;
             const displayName = nameVal || document.getElementById('ssh-name').value || `${sshUser}@${host}`;
             
-            // Capture the currently selected region from the provision modal (if it's not disabled) to use as the default
             const provRegionSelect = document.getElementById('prov-region');
             const activeRegion = regionVal || (provRegionSelect && !provRegionSelect.disabled ? provRegionSelect.value : 'us-east-1');
             
@@ -781,7 +823,6 @@
             
             const awsCredOptions = awsCreds.length ? awsCreds.map(c => `<option value="${c.id}">${c.alias}</option>`).join('') : `<option value="">No AWS Credentials</option>`;
             
-            // Dynamically set the 'selected' attribute so the dropdown matches the captured region
             const activeRegionOptions = awsRegionOptions.replace(`value="${activeRegion}"`, `value="${activeRegion}" selected`);
 
             wrapper.innerHTML = `
