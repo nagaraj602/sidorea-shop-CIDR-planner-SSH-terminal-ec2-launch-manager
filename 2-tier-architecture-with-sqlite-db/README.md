@@ -218,7 +218,7 @@ The repository includes an optimized multi-stage Dockerfile.
 The image includes:
 
 - SQLite
-- Terraform CLI
+- Terraform CLI (Terraform 1.8.0)
 - Node.js Runtime
 
 ## Build the Image
