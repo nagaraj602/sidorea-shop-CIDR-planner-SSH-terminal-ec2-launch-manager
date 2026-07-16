@@ -1,46 +1,55 @@
 ---
-# 1. Headless Service (Required for StatefulSets)
+# ==========================================
+# 1. ENVIRONMENT CONFIGMAP
+# ==========================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sidorea-env-config
+data:
+  PORT: "3000"
+  NODE_ENV: "production"
+
+---
+# ==========================================
+# 2. PERSISTENCE (SQLite & Workspaces)
+# ==========================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sidorea-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# ==========================================
+# 3. APPLICATION TIER: StatefulSet (2-Tier)
+# ==========================================
 apiVersion: v1
 kind: Service
 metadata:
-  name: sidorea-headless
-  labels:
-    app: sidorea-app
+  name: sidorea-app-service
 spec:
-  clusterIP: None # This makes it "headless"
+  type: NodePort # Allows external access on bare metal
   selector:
     app: sidorea-app
   ports:
-    - port: 80
-      targetPort: 80
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30080
 
 ---
-# 2. NodePort Service (To access the app via browser)
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: sidorea-public
-  labels:
-    app: sidorea-app
-spec:
-  type: NodePort
-  selector:
-    app: sidorea-app
-  ports:
-    - port: 80
-      targetPort: 80
-      # nodePort: 30080 # Optional: You can force a specific port between 30000-32767
-
----
-# 3. StatefulSet Configuration
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: sidorea-app
 spec:
-  serviceName: "sidorea-headless"
-  replicas: 1 # Must be 1 when using SQLite to avoid file-locking conflicts
+  serviceName: "sidorea-app-service"
+  replicas: 1
   selector:
     matchLabels:
       app: sidorea-app
@@ -50,36 +59,59 @@ spec:
         app: sidorea-app
     spec:
       containers:
-        - name: sidorea-container
-          image: nagarajkamath602/sidorea-app:latest # Replace with your image
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 80
-          
-          # Health Probes pointing to the new /health endpoint
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 80
-            initialDelaySeconds: 15
-            periodSeconds: 20
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            
-          volumeMounts:
-            - name: sidorea-storage
-              mountPath: /app/data # Mounts to a /data folder in the container
+      - name: sidorea-node
+        image: your-dockerhub-user/sidorea-2tier:latest # REPLACE THIS WITH YOUR IMAGE
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: sidorea-env-config
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data # Preserves SQLite DB, SSH keys, and Terraform workspaces
+      volumes:
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: sidorea-data-pvc
 
-  # Automatically provisions persistent storage for SQLite and Keys
-  volumeClaimTemplates:
-    - metadata:
-        name: sidorea-storage
-      spec:
-        accessModes: [ "ReadWriteOnce" ]
-        resources:
-          requests:
-            storage: 2Gi
+---
+# ==========================================
+# 4. INGRESS (Commented out for future use)
+# ==========================================
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: sidorea-ingress
+#   annotations:
+#     # Instructs cert-manager to fetch SSL via Let's Encrypt automatically
+#     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+#     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+#     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+# spec:
+#   ingressClassName: nginx
+#   tls:
+#   - hosts:
+#     - yourdomain.com
+#     - www.yourdomain.com
+#     secretName: sidorea-tls-secret # Cert-manager will automatically create this Secret
+#   rules:
+#   - host: yourdomain.com
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: sidorea-app-service
+#             port:
+#               number: 3000
+#   - host: www.yourdomain.com
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: sidorea-app-service
+#             port:
+#               number: 3000
