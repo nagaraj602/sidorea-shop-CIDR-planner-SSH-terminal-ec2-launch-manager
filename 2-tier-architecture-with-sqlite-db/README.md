@@ -20,8 +20,8 @@ This repository contains the **2-Tier Architecture** version of the application.
 - [Prerequisites](#-prerequisites)
 - [Bare Metal Installation (PM2)](#-bare-metal-installation-pm2)
 - [Docker Deployment](#-docker-deployment)
-- [Kubernetes Deployment](#-kubernetes-deployment)
 - [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
+- [Kubernetes Deployment](#-kubernetes-deployment)
 - [Security Notice](#-security-notice)
 
 ---
@@ -239,6 +239,34 @@ docker run -d \
 ```
 
 ---
+# 🔒 Enable HTTPS with Nginx & Certbot
+
+For Bare Metal or Docker deployments, use the included SSL installation script.
+
+```bash
+sudo bash SSL-install-script.sh
+```
+
+The script automatically:
+
+1. Installs Nginx
+2. Installs Certbot
+3. Prompts for your domain name
+4. Verifies DNS propagation
+5. Generates Let's Encrypt SSL certificates
+6. Configures Nginx as a reverse proxy
+
+Routing:
+
+| Path | Destination |
+|------|-------------|
+| `/` | Node.js Application (Port 3000) |
+| `/socket.io/` | Node.js Application (Port 3000) |
+
+> **Note**
+>
+> If deploying on Kubernetes, ignore this script and instead configure **cert-manager** with an Ingress resource.
+---
 
 # ☸️ Kubernetes Deployment
 
@@ -267,36 +295,6 @@ http://<Node-IP>:30080
 
 ---
 
-# 🔒 Enable HTTPS with Nginx & Certbot
-
-For Bare Metal or Docker deployments, use the included SSL installation script.
-
-```bash
-sudo bash SSL-install-script.sh
-```
-
-The script automatically:
-
-1. Installs Nginx
-2. Installs Certbot
-3. Prompts for your domain name
-4. Verifies DNS propagation
-5. Generates Let's Encrypt SSL certificates
-6. Configures Nginx as a reverse proxy
-
-Routing:
-
-| Path | Destination |
-|------|-------------|
-| `/` | Node.js Application (Port 3000) |
-| `/socket.io/` | Node.js Application (Port 3000) |
-
-> **Note**
->
-> If deploying on Kubernetes, ignore this script and instead configure **cert-manager** with an Ingress resource.
-
----
-
 # ⚠️ Security Notice
 
 This application acts as a central control plane for AWS and SSH infrastructure.
@@ -310,18 +308,6 @@ Before deploying to production:
 - Enable Role-Based Access Control (RBAC).
 - Restrict access using IP whitelisting.
 - Follow the Principle of Least Privilege for all AWS IAM credentials.
-
----
-
-# 📄 License
-
-Add your preferred license here.
-
-Example:
-
-```
-MIT License
-```
 
 ---
 
