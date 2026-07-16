@@ -247,7 +247,7 @@ The backend Docker image already contains Terraform for infrastructure provision
 ```bash
 cd backend_api
 
-docker build -t sidorea-backend:latest .
+docker build -t sidorea-backend-3-tier:latest .
 ```
 
 ---
@@ -257,7 +257,7 @@ docker build -t sidorea-backend:latest .
 ```bash
 cd ../frontend_public
 
-docker build -t sidorea-frontend:latest .
+docker build -t sidorea-frontend-3-tier:latest .
 ```
 
 ---
@@ -272,7 +272,7 @@ Backend:
 docker run -d \
 -p 3000:3000 \
 --env-file ./backend_api/.env \
-sidorea-backend:latest
+sidorea-backend-3-tier:latest
 ```
 
 Frontend:
@@ -280,7 +280,7 @@ Frontend:
 ```bash
 docker run -d \
 -p 8080:80 \
-sidorea-frontend:latest
+sidorea-frontend-3-tier:latest
 ```
 
 ---
