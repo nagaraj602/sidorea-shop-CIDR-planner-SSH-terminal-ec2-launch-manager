@@ -935,22 +935,43 @@
             const fitAddon = new FitAddon.FitAddon(); term.loadAddon(fitAddon); term.open(document.getElementById(termId));
             setTimeout(() => { fitAddon.fit(); }, 50);
 
+            // MobaXterm-Style: Auto-copy on select
             term.onSelectionChange(() => {
                 const selection = term.getSelection();
                 if (selection) {
-                    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
-                        navigator.clipboard.writeText(selection).catch(() => fallbackCopyTextToClipboard(selection));
-                    } else { fallbackCopyTextToClipboard(selection); }
+                    try {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(selection);
+                        } else {
+                            // Fallback for standard HTTP connections
+                            const textArea = document.createElement("textarea");
+                            textArea.value = selection;
+                            textArea.style.position = "fixed";
+                            textArea.style.opacity = "0";
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                        }
+                    } catch (err) { console.warn("Auto-copy failed", err); }
                 }
             });
 
+            // MobaXterm-Style: Right-click to paste
             document.getElementById(termId).addEventListener('contextmenu', async (e) => {
-                if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
-                    e.preventDefault(); 
-                    try {
+                e.preventDefault(); // Hide the browser's default right-click menu
+                try {
+                    if (navigator.clipboard && navigator.clipboard.readText) {
                         const text = await navigator.clipboard.readText();
-                        if (text && sessionData.socket) { sessionData.socket.emit('terminal-input', text); term.clearSelection(); }
-                    } catch (err) {}
+                        if (text && sessionData.socket) { 
+                            sessionData.socket.emit('terminal-input', text); 
+                            term.clearSelection(); 
+                        }
+                    } else {
+                        // alert("⚠️ Your browser blocks right-click pasting over standard HTTP.\n\nPlease use Ctrl+V (or Cmd+V) to paste, or configure HTTPS/SSL using the bash script to enable right-click pasting.");
+                    }
+                } catch (err) {
+                    alert("⚠️ Clipboard access denied. Please click the icon next to your URL bar to allow clipboard permissions so you can right-click paste.");
                 }
             });
 
