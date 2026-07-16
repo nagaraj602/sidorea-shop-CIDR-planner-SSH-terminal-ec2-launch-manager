@@ -287,10 +287,35 @@ sidorea-frontend:latest
 ```
 
 ---
-Once the Container is up and running, you can do reverse proxy to access the application at your public-IP without requiring port. Also you can install SSL. Just run the below script:
+# 🔒 Enable HTTPS with Nginx & Certbot
+
+For Bare Metal or Docker deployments, use the included SSL installation script.
+
+```bash
+sudo bash SSL-install-script.sh
 ```
-bash SSL-install-on-docker-container-script.sh
-```
+
+The script automatically:
+
+1. Installs Nginx
+2. Installs Certbot
+3. Prompts for your domain name
+4. Verifies DNS propagation
+5. Generates Let's Encrypt SSL certificates
+6. Configures Nginx reverse proxy
+
+Routing:
+
+| Path | Destination |
+|------|-------------|
+| `/` | Frontend (Port 8080) |
+| `/api/` | Backend (Port 3000) |
+| `/socket.io/` | Backend (Port 3000) |
+
+> **Note**
+>
+> If using Kubernetes, ignore this script and instead configure **cert-manager** with an Ingress resource.
+
 ---
 
 # ☸️ Kubernetes Deployment
@@ -321,37 +346,6 @@ Access the application:
 ```
 http://<Node-IP>:30080
 ```
-
----
-
-# 🔒 Enable HTTPS with Nginx & Certbot
-
-For Bare Metal or Docker deployments, use the included SSL installation script.
-
-```bash
-sudo bash SSL-install-script.sh
-```
-
-The script automatically:
-
-1. Installs Nginx
-2. Installs Certbot
-3. Prompts for your domain name
-4. Verifies DNS propagation
-5. Generates Let's Encrypt SSL certificates
-6. Configures Nginx reverse proxy
-
-Routing:
-
-| Path | Destination |
-|------|-------------|
-| `/` | Frontend (Port 8080) |
-| `/api/` | Backend (Port 3000) |
-| `/socket.io/` | Backend (Port 3000) |
-
-> **Note**
->
-> If using Kubernetes, ignore this script and instead configure **cert-manager** with an Ingress resource.
 
 ---
 
