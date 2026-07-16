@@ -1,4 +1,95 @@
+#!/bin/bash
+
+# This script is to install everything on your bare metal server and make the app up without using docker or Kubernetes. App backend uses port 3000 but nginx will reverse proxy it and app runs on port 80 (HTTP) or 443 (HTTPS)
+
+# Detect Linux Distribution
+distro=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
+
+case "$distro" in
+    ubuntu)
+        echo "Detected Ubuntu Distro."
+        ;;
+    debian)
+        echo "Detected Debian Distro."
+        ;;
+    *)
+        echo "Unsupported Linux Distribution: $distro. You can have only Ubuntu and Debian"
+        exit 1
+        ;;
+esac
+
+# Update System
+echo "🚀 Starting System Update..."
+sudo apt-get update >/dev/null 2>&1
+sudo apt-get upgrade -y >/dev/null 2>&1
+
+# Install Required Packages
+echo "📦 Installing Required Packages..."
+sudo apt install postgresql postgresql-contrib nodejs npm nginx curl wget gnupg software-properties-common ca-certificates apt-transport-https dnsutils -y >/dev/null 2>&1
+
 ############################################
+# Install Terraform
+############################################
+echo "🏗️ Installing Terraform..."
+if ! command -v terraform >/dev/null; then
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg >/dev/null 2>&1
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null 2>&1
+    sudo apt-get update >/dev/null 2>&1
+    sudo apt-get install -y terraform >/dev/null 2>&1
+else
+    echo "Terraform already installed."
+fi
+
+############################################
+# Configure PostgreSQL
+############################################
+echo "🗄️ Configuring Database..."
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+
+sudo -i -u postgres psql -c "CREATE DATABASE sidorea_db;"
+sudo -i -u postgres psql -c "CREATE USER sidorea_user WITH ENCRYPTED PASSWORD 'supersecurepassword';"
+sudo -i -u postgres psql -c "ALTER DATABASE sidorea_db OWNER TO sidorea_user;"
+
+############################################
+# Install PM2
+############################################
+echo "⚙️ Installing PM2..."
+if ! command -v pm2 >/dev/null 2>&1; then
+    sudo npm install -g pm2 >/dev/null 2>&1
+else
+    echo "PM2 already installed."
+fi
+
+############################################
+# Configure and Start Backend
+############################################
+echo "📥 Installing Project Dependencies..."
+cd backend_api
+
+cat << 'EOF' > .env
+PORT=3000
+DB_USER=sidorea_user
+DB_PASSWORD=supersecurepassword
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=sidorea_db
+EOF
+
+npm install >/dev/null 2>&1
+
+echo "🚀 Starting Application..."
+if sudo pm2 describe sidorea-api >/dev/null 2>&1; then
+    sudo pm2 restart sidorea-api >/dev/null 2>&1
+else
+    sudo pm2 start server.js --name sidorea-api >/dev/null 2>&1
+fi
+
+sudo pm2 save >/dev/null 2>&1
+cd ..
+
+
+echo############################################
 # SSL / HTTPS Configuration & Nginx Routing
 ############################################
 PUBLIC_IP=$(curl -s ifconfig.me)
