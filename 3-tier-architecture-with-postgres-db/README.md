@@ -24,8 +24,8 @@ This repository contains the **3-Tier Architecture** version of the application,
 - [Prerequisites](#-prerequisites)
 - [Bare Metal Installation (PM2)](#-bare-metal-installation-pm2)
 - [Docker Deployment](#-docker-deployment)
-- [Kubernetes Deployment](#-kubernetes-deployment)
 - [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
+- [Kubernetes Deployment](#-kubernetes-deployment)
 - [Security Notice](#-security-notice)
 
 ---
