@@ -60,7 +60,7 @@ spec:
     spec:
       containers:
       - name: sidorea-node
-        image: your-dockerhub-user/sidorea-2tier:latest # REPLACE THIS WITH YOUR IMAGE
+        image: nagarajkamath602/sidorea-2tier:latest # REPLACE THIS WITH YOUR IMAGE
         ports:
         - containerPort: 3000
         envFrom:
