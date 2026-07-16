@@ -123,7 +123,7 @@ spec:
     spec:
       containers:
       - name: backend-api
-        image: your-dockerhub-user/sidorea-backend:latest # REPLACE THIS WITH YOUR IMAGE
+        image: nagarajkamath602/sidorea-backend-3-tier:latest # REPLACE THIS WITH YOUR IMAGE
         ports:
         - containerPort: 3000
         envFrom:
@@ -204,7 +204,7 @@ spec:
     spec:
       containers:
       - name: frontend-web
-        image: your-dockerhub-user/sidorea-frontend:latest # REPLACE THIS WITH YOUR IMAGE
+        image: nagarajkamath602/sidorea-frontend-3-tier:latest # REPLACE THIS WITH YOUR IMAGE
         ports:
         - containerPort: 80
         volumeMounts:
