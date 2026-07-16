@@ -12,7 +12,7 @@ RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the monolithic application (server.js, public folder, etc.)
+# Copy the rest of the application
 COPY . .
 
 # ==========================================
