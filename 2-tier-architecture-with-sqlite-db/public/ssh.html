@@ -938,47 +938,51 @@
             // MobaXterm-Style: Auto-copy on select
             term.onSelectionChange(() => {
                 const selection = term.getSelection();
-                if (selection) {
-                    try {
-                        if (navigator.clipboard && window.isSecureContext) {
-                            navigator.clipboard.writeText(selection).catch(()=>{});
-                        } else {
-                            // Fallback for standard HTTP connections
-                            const textArea = document.createElement("textarea");
-                            textArea.value = selection;
-                            textArea.style.position = "fixed";
-                            textArea.style.opacity = "0";
-                            document.body.appendChild(textArea);
-                            textArea.select();
-                            document.execCommand('copy');
-                            document.body.removeChild(textArea);
-                            
-                            // CRITICAL FIX: Restore focus back to the terminal so Ctrl+V works!
-                            term.focus();
-                        }
-                    } catch (err) {}
-                }
+                if (!selection) return;
+                
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(selection).catch(()=>{});
+                    } else {
+                        // Fallback for standard HTTP
+                        const textArea = document.createElement("textarea");
+                        textArea.value = selection;
+                        textArea.style.position = "absolute";
+                        textArea.style.left = "-9999px";
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                    }
+                } catch (err) {}
+                
+                // CRITICAL: Delay the focus return by 10ms so Xterm reclaims the cursor.
+                // This guarantees Ctrl+V will work immediately after highlighting.
+                setTimeout(() => term.focus(), 10);
             });
 
             // MobaXterm-Style: Right-click to paste
             document.getElementById(termId).addEventListener('contextmenu', async (e) => {
-                e.preventDefault(); // Hide the browser's default right-click menu
-                try {
-                    if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
+                e.preventDefault(); // Hide the browser's default menu
+                
+                // If on HTTPS (SSL), we can paste automatically just like MobaXterm!
+                if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
+                    try {
                         const text = await navigator.clipboard.readText();
                         if (text && sessionData.socket) { 
                             sessionData.socket.emit('terminal-input', text); 
                             term.clearSelection(); 
                         }
-                    } else {
-                        alert("⚠️ Your browser blocks right-click pasting over standard HTTP.\n\nPlease use Ctrl+V (or Cmd+V) to paste.");
-                        // Restore focus after the alert closes
-                        term.focus(); 
+                    } catch (err) {
+                        alert("⚠️ Clipboard access denied. Please allow clipboard permissions in your browser's URL bar.");
                     }
-                } catch (err) {
-                    alert("⚠️ Clipboard access denied. Please click the icon next to your URL bar to allow clipboard permissions.");
-                    term.focus();
+                } else {
+                    // If on HTTP, alert the user about the browser restriction.
+                    alert("⚠️ Right-click pasting requires HTTPS (SSL).\n\nBecause you are on an IP address (HTTP), browser security blocks JavaScript from reading your clipboard.\n\nPlease use Ctrl+V or Shift+Insert to paste.");
                 }
+                
+                // Reclaim cursor focus
+                setTimeout(() => term.focus(), 10);
             });
 
             const socket = io();
