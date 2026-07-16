@@ -287,6 +287,11 @@ sidorea-frontend:latest
 ```
 
 ---
+Once the Container is up and running, you can do reverse proxy to access the application at your public-IP without requiring port. Also you can install SSL. Just run the below script:
+```
+bash SSL-install-on-docker-container-script.sh
+```
+---
 
 # ☸️ Kubernetes Deployment
 
