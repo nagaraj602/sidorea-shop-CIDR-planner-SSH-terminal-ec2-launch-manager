@@ -247,7 +247,7 @@ if [ "$SSL_CHOICE" == "1" ]; then
         --redirect \
         --email "$EMAIL" \
         -d "$DOMAIN" \
-        -d "www.$DOMAIN"
+        -d "www.$DOMAIN" >/dev/null 2>&1
 fi
 
 ############################################
