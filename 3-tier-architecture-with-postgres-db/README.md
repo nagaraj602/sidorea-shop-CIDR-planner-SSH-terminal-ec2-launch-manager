@@ -288,7 +288,7 @@ nagarajkamath602/sidorea-frontend-3-tier:latest
 For Bare Metal or Docker deployments, use the included SSL installation script.
 
 ```bash
-sudo bash SSL-install-script.sh
+bash SSL-install-on-docker-container-script.sh
 ```
 
 The script automatically:
