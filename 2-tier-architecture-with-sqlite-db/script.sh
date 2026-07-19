@@ -17,7 +17,7 @@ case "$distro" in
 esac
 
 # Update System
-echo "🚀 Starting System Update..."
+echo "🚀 Starting System Package Update..."
 sudo apt-get update >/dev/null 2>&1
 sudo apt-get upgrade -y >/dev/null 2>&1
 
