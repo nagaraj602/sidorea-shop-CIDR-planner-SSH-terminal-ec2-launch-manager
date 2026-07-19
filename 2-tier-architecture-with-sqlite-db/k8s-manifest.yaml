@@ -1,3 +1,22 @@
+# ==========================================
+# 0. PERSISTENT VOLUME (For Bare Metal / Local)
+# ==========================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sidorea-data-pv
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/sidorea/app-data"
+    type: DirectoryOrCreate
+
 ---
 # ==========================================
 # 1. ENVIRONMENT CONFIGMAP
@@ -21,6 +40,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: manual # Links directly to our manual PV
   resources:
     requests:
       storage: 5Gi
