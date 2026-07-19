@@ -1,4 +1,5 @@
 You can run the Kubernetes manifest with NodePort and access the application at http://<public_ip>:30080
+
 ---
 ## OR 
 ---
