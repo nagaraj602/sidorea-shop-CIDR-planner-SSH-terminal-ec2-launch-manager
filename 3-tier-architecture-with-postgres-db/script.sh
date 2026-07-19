@@ -89,7 +89,7 @@ sudo pm2 save >/dev/null 2>&1
 cd ..
 
 
-echo############################################
+############################################
 # SSL / HTTPS Configuration & Nginx Routing
 ############################################
 PUBLIC_IP=$(curl -s ifconfig.me)
