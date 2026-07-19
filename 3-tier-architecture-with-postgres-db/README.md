@@ -304,7 +304,7 @@ Routing:
 
 | Path | Destination |
 |------|-------------|
-| `/` | Frontend (Port 8080) |
+| `/` | Frontend (Port 8085) |
 | `/api/` | Backend (Port 3000) |
 | `/socket.io/` | Backend (Port 3000) |
 
