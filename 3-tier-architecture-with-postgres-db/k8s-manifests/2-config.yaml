@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sidorea-env-config
+data:
+  PORT: "3000"
+  DB_HOST: "sidorea-db-service"
+  DB_PORT: "5432"
+  DB_NAME: "sidorea_db"
+  DB_USER: "sidorea_user"
+  POSTGRES_DB: "sidorea_db"
+  POSTGRES_USER: "sidorea_user"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sidorea-db-secret
+type: Opaque
+stringData:
+  DB_PASSWORD: "supersecurepassword"
+  POSTGRES_PASSWORD: "supersecurepassword"
