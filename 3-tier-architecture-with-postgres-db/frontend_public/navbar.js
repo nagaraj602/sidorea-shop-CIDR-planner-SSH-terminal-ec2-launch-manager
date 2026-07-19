@@ -39,10 +39,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 <img src="/logo.png" alt="Sidorea" class="logo-img">
                 <div class="nav-links">
                     <a href="/dashboard" class="${activePage.includes('/dashboard') ? 'active' : ''}">Back to Dashboard</a>
-
-
-
-
+                    <a href="/app" class="${activePage.includes('/app') ? 'active' : ''}">CIDR Calculator</a>
+                    <a href="/ssh" class="${activePage.includes('/ssh') ? 'active' : ''}">SSH Terminals</a>
+                    <a href="/vpc" class="${activePage.includes('/vpc') ? 'active' : ''}">AWS VPC Builder</a>
+                    <a href="/ec2" class="${activePage.includes('/ec2') ? 'active' : ''}">EC2 Types</a>
+                    <a href="/storage" class="${activePage.includes('/storage') ? 'active' : ''}">Storage Studio</a>
                     
                 </div>
             </div>
