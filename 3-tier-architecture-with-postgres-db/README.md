@@ -271,15 +271,15 @@ Backend:
 docker run -d \
 -p 3000:3000 \
 --env-file ./backend_api/.env \
-sidorea-backend-3-tier:latest
+nagarajkamath602/sidorea-backend-3-tier:latest
 ```
 
 Frontend:
 
 ```bash
 docker run -d \
--p 8080:80 \
-sidorea-frontend-3-tier:latest
+-p 8085:80 \
+nagarajkamath602/sidorea-frontend-3-tier:latest
 ```
 
 ---
