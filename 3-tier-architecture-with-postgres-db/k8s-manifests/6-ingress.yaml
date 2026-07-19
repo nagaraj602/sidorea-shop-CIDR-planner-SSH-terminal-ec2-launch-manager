@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: sidorea-alb-ingress
   annotations:
-    kubernetes.io/ingress.class: alb
+    # Notice the kubernetes.io/ingress.class annotation is gone
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
@@ -11,8 +11,10 @@ metadata:
     # Uncomment and replace when you have an ACM certificate
     # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
 spec:
+  # This is the modern, forward-compatible way to target the ALB controller
+  ingressClassName: alb 
   rules:
-    - http: # Add host: yourdomain.com here if you want to restrict to a specific domain
+    - http: 
         paths:
           - path: /api/
             pathType: Prefix
