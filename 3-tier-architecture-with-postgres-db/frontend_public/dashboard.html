@@ -7,6 +7,12 @@
     <style>
         body { font-family: system-ui; padding: 50px; text-align: center; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; max-width: 800px; margin: auto; }
+        .dashboard-card {
+            background-color: var(--card-bg); 
+            color: var(--text);
+            border: 1px solid var(--border);
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s; /* Ensures smooth switching */
+        }
         .card { padding: 30px; border: 1px solid #cbd5e1; border-radius: 8px; text-decoration: none; color: #334155; font-weight: bold; }
         .card:hover { background: #eff6ff; }
     </style>
