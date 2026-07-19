@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-app-service
+spec:
+  type: ClusterIP # Upgraded from NodePort for security and ALB compatibility
+  selector:
+    app: sidorea-app
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sidorea-app
+spec:
+  serviceName: "sidorea-app-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidorea-app
+  template:
+    metadata:
+      labels:
+        app: sidorea-app
+    spec:
+      containers:
+      - name: sidorea-node
+        image: nagarajkamath602/sidorea-2tier:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: sidorea-env-config
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data # Preserves SQLite DB, SSH keys, and Terraform workspaces
+      volumes:
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: sidorea-data-pvc
