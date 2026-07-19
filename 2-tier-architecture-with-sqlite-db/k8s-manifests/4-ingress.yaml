@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sidorea-alb-ingress
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Routes traffic directly to Pod IPs for lower latency
+    alb.ingress.kubernetes.io/target-type: ip
+    # Configures ALB to listen on both HTTP and HTTPS
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    # Automatically redirects all HTTP traffic to HTTPS
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # TODO: Uncomment and add your AWS ACM Certificate ARN before applying
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
+spec:
+  rules:
+    - http:
+        paths:
+          # WebSockets (SSH Tunnels)
+          - path: /socket.io/
+            pathType: Prefix
+            backend:
+              service:
+                name: sidorea-app-service
+                port:
+                  number: 3000
+          
+          # Catch-all for Frontend UI and standard API requests
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sidorea-app-service
+                port:
+                  number: 3000
