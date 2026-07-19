@@ -11,6 +11,13 @@ This application provides a unified dashboard to:
 
 This repository contains the **2-Tier Architecture** version of the application. It runs as a **monolithic Node.js application** that serves both the frontend and backend, while using a local **SQLite** database for maximum simplicity and portability.
 
+<img width="2880" height="1702" alt="Screenshot 2026-07-19 201143" src="https://github.com/user-attachments/assets/ee712bc5-99ff-418f-ac33-c16caa8754ad" />
+<img width="2880" height="1698" alt="Screenshot 2026-07-19 201226" src="https://github.com/user-attachments/assets/f562b73f-310f-4830-84ae-d7936f3c2128" />
+<img width="2880" height="1696" alt="Screenshot 2026-07-19 201920" src="https://github.com/user-attachments/assets/30743eb2-6906-4cf8-a2d9-30d184f8893a" />
+<img width="2880" height="1800" alt="Screenshot 2026-07-19 211324" src="https://github.com/user-attachments/assets/93506122-48df-4541-bb75-a77cbcec6a7c" />
+<img width="2880" height="1800" alt="Screenshot 2026-07-19 211347" src="https://github.com/user-attachments/assets/57d3e2de-9d0e-485e-8a04-8d4cbfee153b" />
+<img width="2880" height="1800" alt="Screenshot 2026-07-19 211356" src="https://github.com/user-attachments/assets/38d9c451-5707-4dd0-9e4f-d894dc3898b9" />
+
 ---
 
 # 📑 Table of Contents
