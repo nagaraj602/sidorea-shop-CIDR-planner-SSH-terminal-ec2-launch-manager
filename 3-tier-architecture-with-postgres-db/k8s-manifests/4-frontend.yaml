@@ -1,1 +1,34 @@
-t
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-frontend-service
+spec:
+  type: ClusterIP 
+  selector:
+    app: sidorea-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidorea-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidorea-frontend
+  template:
+    metadata:
+      labels:
+        app: sidorea-frontend
+    spec:
+      containers:
+      - name: frontend-web
+        image: nagarajkamath602/sidorea-frontend-3-tier:latest
+        ports:
+        - containerPort: 80
+        # Notice we removed the custom ConfigMap mount for Nginx.
+        # The default Nginx configuration is perfectly fine now that 
+        # the ALB is handling the /api/ and /socket.io/ routing.
