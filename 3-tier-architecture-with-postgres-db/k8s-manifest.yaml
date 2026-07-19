@@ -1,3 +1,39 @@
+# ==========================================
+# 0. PERSISTENT VOLUMES (For Bare Metal / Local)
+# ==========================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sidorea-db-pv
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/sidorea/db"
+    type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sidorea-backend-pv
+spec:
+  capacity:
+    storage: 2Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/sidorea/backend"
+    type: DirectoryOrCreate
+
 ---
 # ==========================================
 # 1. ENVIRONMENT CONFIGMAP & SECRET
@@ -75,6 +111,7 @@ spec:
       name: postgres-data
     spec:
       accessModes: [ "ReadWriteOnce" ]
+      storageClassName: manual # Links directly to our manual PV
       resources:
         requests:
           storage: 5Gi
@@ -90,6 +127,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: manual # Links directly to our manual PV
   resources:
     requests:
       storage: 2Gi
@@ -123,7 +161,7 @@ spec:
     spec:
       containers:
       - name: backend-api
-        image: nagarajkamath602/sidorea-backend-3-tier:latest # REPLACE THIS WITH YOUR IMAGE
+        image: nagarajkamath602/sidorea-backend-3-tier:latest
         ports:
         - containerPort: 3000
         envFrom:
@@ -204,7 +242,7 @@ spec:
     spec:
       containers:
       - name: frontend-web
-        image: nagarajkamath602/sidorea-frontend-3-tier:latest # REPLACE THIS WITH YOUR IMAGE
+        image: nagarajkamath602/sidorea-frontend-3-tier:latest
         ports:
         - containerPort: 80
         volumeMounts:
@@ -215,45 +253,3 @@ spec:
       - name: nginx-config
         configMap:
           name: sidorea-nginx-config
-
----
-# ==========================================
-# 5. INGRESS (Commented out for future use)
-# ==========================================
-# apiVersion: networking.k8s.io/v1
-# kind: Ingress
-# metadata:
-#   name: sidorea-ingress
-#   annotations:
-#     # Instructs cert-manager to fetch SSL via Let's Encrypt automatically
-#     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-#     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-#     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-# spec:
-#   ingressClassName: nginx
-#   tls:
-#   - hosts:
-#     - yourdomain.com
-#     - www.yourdomain.com
-#     secretName: sidorea-tls-secret # Cert-manager will automatically create this Secret
-#   rules:
-#   - host: yourdomain.com
-#     http:
-#       paths:
-#       - path: /
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: sidorea-frontend-service
-#             port:
-#               number: 80
-#   - host: www.yourdomain.com
-#     http:
-#       paths:
-#       - path: /
-#         pathType: Prefix
-#         backend:
-#           service:
-#             name: sidorea-frontend-service
-#             port:
-#               number: 80
