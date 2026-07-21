@@ -1,3 +1,18 @@
+// Global Security: Block Context Menu & DevTools Shortcuts
+document.addEventListener('contextmenu', event => event.preventDefault());
+document.onkeydown = function(e) {
+    if (e.keyCode == 123 || 
+       (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0))) || 
+       (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0))) {
+        return false;
+    }
+};
+// Nullify console output
+Object.defineProperty(window, 'console', {
+    value: Object.freeze({ log: function(){}, info: function(){}, warn: function(){}, error: function(){} })
+});
+
+
 document.addEventListener("DOMContentLoaded", () => {
     const user = localStorage.getItem('cidr_user');
     const activePage = window.location.pathname;
