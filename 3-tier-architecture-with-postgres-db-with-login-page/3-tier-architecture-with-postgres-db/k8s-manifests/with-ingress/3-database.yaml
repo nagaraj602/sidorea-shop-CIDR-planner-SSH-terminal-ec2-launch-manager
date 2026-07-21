@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-db-service
+spec:
+  type: ClusterIP
+  selector:
+    app: sidorea-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sidorea-db
+spec:
+  serviceName: "sidorea-db-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidorea-db
+  template:
+    metadata:
+      labels:
+        app: sidorea-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - configMapRef:
+            name: sidorea-env-config
+        - secretRef:
+            name: sidorea-db-secret
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: manual
+      resources:
+        requests:
+          storage: 5Gi

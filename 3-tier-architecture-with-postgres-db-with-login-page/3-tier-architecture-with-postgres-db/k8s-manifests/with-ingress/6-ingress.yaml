@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sidorea-alb-ingress
+  annotations:
+    # Notice the kubernetes.io/ingress.class annotation is gone
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # Uncomment and replace when you have an ACM certificate
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID
+spec:
+  # This is the modern, forward-compatible way to target the ALB controller
+  ingressClassName: alb 
+  rules:
+    - http: 
+        paths:
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: sidorea-backend-service
+                port:
+                  number: 3000
+          - path: /socket.io/
+            pathType: Prefix
+            backend:
+              service:
+                name: sidorea-backend-service
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sidorea-frontend-service
+                port:
+                  number: 80

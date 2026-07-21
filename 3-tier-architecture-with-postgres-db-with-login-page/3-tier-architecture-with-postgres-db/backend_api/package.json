@@ -1,0 +1,33 @@
+{
+  "name": "sidorea-shop-cidr-planner-ssh-terminal-ec2-launch-manager",
+  "version": "1.0.0",
+  "description": "A comprehensive DevOps platform with CIDR calculator, SSH terminal, AWS EC2 launcher, Terraform automation, and VPC builder.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "devops",
+    "aws",
+    "terraform",
+    "cidr",
+    "ssh",
+    "ec2",
+    "postgresql",
+    "socketio"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-ec2": "^3.883.0",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "socket.io": "^4.8.1",
+    "pg": "^8.11.3",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5",
+    "bcryptjs": "^2.4.3",
+    "nodemailer": "^6.9.13",
+    "ssh2": "^1.17.0"
+  }
+}

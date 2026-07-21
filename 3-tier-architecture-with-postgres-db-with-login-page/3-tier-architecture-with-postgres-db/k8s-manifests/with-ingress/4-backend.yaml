@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sidorea-backend-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: sidorea-backend
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidorea-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidorea-backend
+  template:
+    metadata:
+      labels:
+        app: sidorea-backend
+    spec:
+      containers:
+      - name: backend-api
+        image: nagarajkamath602/sidorea-backend-3-tier:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: sidorea-env-config
+        - secretRef:
+            name: sidorea-db-secret
+        volumeMounts:
+        - name: backend-data
+          mountPath: /app/data
+      volumes:
+      - name: backend-data
+        persistentVolumeClaim:
+          claimName: sidorea-backend-pvc

@@ -1,0 +1,255 @@
+# ==========================================
+# 0. PERSISTENT VOLUMES (For Bare Metal / Local)
+# ==========================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sidorea-db-pv
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/sidorea/db"
+    type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sidorea-backend-pv
+spec:
+  capacity:
+    storage: 2Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/sidorea/backend"
+    type: DirectoryOrCreate
+
+---
+# ==========================================
+# 1. ENVIRONMENT CONFIGMAP & SECRET
+# ==========================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sidorea-env-config
+data:
+  PORT: "3000"
+  DB_HOST: "sidorea-db-service" # Resolves via K8s internal DNS
+  DB_PORT: "5432"
+  DB_NAME: "sidorea_db"
+  DB_USER: "sidorea_user"
+  POSTGRES_DB: "sidorea_db"
+  POSTGRES_USER: "sidorea_user"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sidorea-db-secret
+type: Opaque
+stringData:
+  DB_PASSWORD: "supersecurepassword"
+  POSTGRES_PASSWORD: "supersecurepassword"
+
+---
+# ==========================================
+# 2. DATA TIER: POSTGRESQL (StatefulSet)
+# ==========================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-db-service
+spec:
+  selector:
+    app: sidorea-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sidorea-db
+spec:
+  serviceName: "sidorea-db-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidorea-db
+  template:
+    metadata:
+      labels:
+        app: sidorea-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        envFrom:
+        - configMapRef:
+            name: sidorea-env-config
+        - secretRef:
+            name: sidorea-db-secret
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+  # Dynamically provisions persistent storage for the database
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: manual # Links directly to our manual PV
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+# ==========================================
+# 3. APPLICATION TIER: NODE.JS BACKEND
+# ==========================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sidorea-backend-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual # Links directly to our manual PV
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-backend-service
+spec:
+  selector:
+    app: sidorea-backend
+  ports:
+    - port: 3000
+      targetPort: 3000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidorea-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidorea-backend
+  template:
+    metadata:
+      labels:
+        app: sidorea-backend
+    spec:
+      containers:
+      - name: backend-api
+        image: nagarajkamath602/sidorea-backend-3-tier:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: sidorea-env-config
+        - secretRef:
+            name: sidorea-db-secret
+        volumeMounts:
+        - name: backend-data
+          mountPath: /app/data # Preserves SSH keys and Terraform workspaces
+      volumes:
+      - name: backend-data
+        persistentVolumeClaim:
+          claimName: sidorea-backend-pvc
+
+---
+# ==========================================
+# 4. WEB TIER: NGINX FRONTEND
+# ==========================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sidorea-nginx-config
+data:
+  default.conf: |
+    server {
+        listen 80;
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri.html $uri/ =404;
+        }
+        # Route API to the Backend Service
+        location /api/ {
+            proxy_pass http://sidorea-backend-service:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        # Route WebSockets to the Backend Service
+        location /socket.io/ {
+            proxy_pass http://sidorea-backend-service:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+        }
+    }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sidorea-frontend-service
+spec:
+  type: NodePort # Allows external access on bare metal
+  selector:
+    app: sidorea-frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sidorea-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sidorea-frontend
+  template:
+    metadata:
+      labels:
+        app: sidorea-frontend
+    spec:
+      containers:
+      - name: frontend-web
+        image: nagarajkamath602/sidorea-frontend-3-tier:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: sidorea-nginx-config

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidorea Login & Signup</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <style>
+        body { font-family: system-ui; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f4f5; margin: 0; }
+        .card { background: white; padding: 2.5rem 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 320px; }
+        .login-logo { height: 60px; margin-bottom: 15px; object-fit: contain; display: block; margin-left: auto; margin-right: auto; }
+        h2 { margin-top: 0; color: #334155; text-align: center; }
+        input { padding: 10px; margin: 10px 0; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 12px 20px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; font-size: 15px; margin-top: 10px; }
+        button:hover { background: #1d4ed8; }
+        .tabs { display: flex; border-bottom: 1px solid #ccc; margin-bottom: 15px; }
+        .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; color: #64748b; font-weight: bold; font-size: 14px; }
+        .tab.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+        .form-section { display: none; }
+        .form-section.active { display: block; }
+        .alert { padding: 10px; margin-bottom: 10px; border-radius: 4px; display: none; font-size: 14px; text-align: center; }
+        .alert.error { background: #fee2e2; color: #991b1b; }
+        .alert.success { background: #dcfce7; color: #166534; }
+    </style>
+    
+    <!-- Security: Block Console & DevTools -->
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function(e) {
+            if (e.keyCode == 123 || 
+               (e.ctrlKey && e.shiftKey && (e.keyCode == 'I'.charCodeAt(0) || e.keyCode == 'C'.charCodeAt(0) || e.keyCode == 'J'.charCodeAt(0))) || 
+               (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0))) {
+                return false;
+            }
+        };
+        Object.defineProperty(window, 'console', {
+            value: Object.freeze({ log: function(){}, info: function(){}, warn: function(){}, error: function(){} })
+        });
+    </script>
+</head>
+<body>
+    <div class="card">
+        <img src="/logo.png" alt="Sidorea Logo" class="login-logo" onerror="this.style.display='none'">
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('login')">Login</div>
+            <div class="tab" onclick="switchTab('otp')">OTP Login</div>
+            <div class="tab" onclick="switchTab('signup')">Sign Up</div>
+        </div>
+
+        <div id="alert-box" class="alert"></div>
+
+        <div id="login" class="form-section active">
+            <input type="text" id="login-identifier" placeholder="Username or Email" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <button onclick="loginPassword()">Login</button>
+        </div>
+
+        <div id="otp" class="form-section">
+            <div id="otp-step-1">
+                <input type="email" id="otp-email" placeholder="Registered Email Address" required>
+                <button onclick="sendOtp()">Send OTP</button>
+            </div>
+            <div id="otp-step-2" style="display: none;">
+                <p style="font-size: 13px; color: #64748b; text-align: center;">Check your email for the code.</p>
+                <input type="text" id="otp-code" placeholder="Enter 6-digit OTP" required>
+                <button onclick="verifyOtp()">Verify & Login</button>
+            </div>
+        </div>
+
+        <div id="signup" class="form-section">
+            <input type="text" id="signup-username" placeholder="Choose Username" required>
+            <input type="email" id="signup-email" placeholder="Email Address" required>
+            <input type="password" id="signup-password" placeholder="Password (Min 8 chars)" required>
+            <button onclick="signupUser()">Create Account</button>
+        </div>
+    </div>
+    
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.form-section').forEach(f => f.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+            hideAlert();
+        }
+
+        function showAlert(msg, isError = true) {
+            const alertBox = document.getElementById('alert-box');
+            alertBox.textContent = msg;
+            alertBox.className = `alert ${isError ? 'error' : 'success'}`;
+            alertBox.style.display = 'block';
+        }
+        function hideAlert() { document.getElementById('alert-box').style.display = 'none'; }
+
+        async function signupUser() {
+            const username = document.getElementById('signup-username').value.trim();
+            const email = document.getElementById('signup-email').value.trim();
+            const password = document.getElementById('signup-password').value;
+
+            if (password.length < 8) return showAlert("Password must be at least 8 characters.");
+            
+            try {
+                const res = await fetch('/api/signup', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                if (res.ok) {
+                    showAlert("Account created successfully! Please log in.", false);
+                    setTimeout(() => switchTab('login'), 2000);
+                } else { showAlert(await res.text()); }
+            } catch (err) { showAlert("Network error."); }
+        }
+
+        async function loginPassword() {
+            const identifier = document.getElementById('login-identifier').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifier, password })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('cidr_user', data.username);
+                    window.location.href = '/dashboard';
+                } else { showAlert(await res.text()); }
+            } catch (err) { showAlert("Network error."); }
+        }
+
+        async function sendOtp() {
+            const email = document.getElementById('otp-email').value.trim();
+            if(!email) return showAlert("Enter your email address.");
+            
+            try {
+                const res = await fetch('/api/send-otp', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                if (res.ok) {
+                    showAlert("OTP Sent! Check your email.", false);
+                    document.getElementById('otp-step-1').style.display = 'none';
+                    document.getElementById('otp-step-2').style.display = 'block';
+                } else { showAlert(await res.text()); }
+            } catch (err) { showAlert("Network error."); }
+        }
+
+        async function verifyOtp() {
+            const email = document.getElementById('otp-email').value.trim();
+            const otp = document.getElementById('otp-code').value.trim();
+            
+            try {
+                const res = await fetch('/api/verify-otp', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, otp })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('cidr_user', data.username);
+                    window.location.href = '/dashboard';
+                } else { showAlert(await res.text()); }
+            } catch (err) { showAlert("Network error."); }
+        }
+    </script>
+</body>
+</html>
