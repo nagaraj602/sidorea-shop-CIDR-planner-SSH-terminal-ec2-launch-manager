@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 </a>
                 <div class="nav-links">
                     <!-- Compact Home Icon added here -->
-                    <a href="/dashboard" title="Back to Dashboard" style="font-size: 18px; padding: 4px 10px;">🏠</a>
+                    <a href="/dashboard" title="Back to Dashboard" style="font-size: 18px; padding: 4px 10px;">Home</a>
                     <a href="/app" class="${activePage.includes('/app') ? 'active' : ''}">CIDR Calculator</a>
                     <a href="/ssh" class="${activePage.includes('/ssh') ? 'active' : ''}">SSH Terminals</a>
                     <a href="/vpc" class="${activePage.includes('/vpc') ? 'active' : ''}">AWS VPC Builder</a>
