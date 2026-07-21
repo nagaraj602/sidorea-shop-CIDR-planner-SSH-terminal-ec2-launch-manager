@@ -90,8 +90,10 @@ SMTP_USER=$ZOHO_EMAIL
 SMTP_PASS=$ZOHO_PASS
 EOF
 
+echo "📥 Installing the Application..."
 npm install >/dev/null 2>&1
 
+echo
 echo "🚀 Starting Application..."
 if sudo pm2 describe sidorea-api >/dev/null 2>&1; then
     sudo pm2 restart sidorea-api >/dev/null 2>&1
