@@ -57,6 +57,10 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <div style="display: flex; align-items: center;">
                 <span style="margin-right: 15px; font-weight:500; text-transform: capitalize;">User: ${user || 'Guest'}</span>
+                
+                <!-- Compact Back to Dashboard Button -->
+                <button class="theme-toggle" style="margin-right: 10px; font-size: 16px; padding: 4px 10px;" onclick="window.location.href='/dashboard'" title="Back to Dashboard">🏠</button>
+                
                 <button class="theme-toggle" onclick="openPasswordModal()">🔑 Profile</button>
                 <button class="theme-toggle" style="margin-left: 10px;" onclick="toggleGlobalTheme()">🌓 Theme</button>
                 <button class="theme-toggle logout-btn" onclick="logoutUser()">🚪 Logout</button>
