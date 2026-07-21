@@ -66,6 +66,14 @@ fi
 ############################################
 echo "📥 Installing Project Dependencies..."
 cd backend_api
+# Prompt for SMTP Credentials securely
+echo
+echo "===================================================="
+echo "📧 Configure Zoho SMTP Credentials for OTP"
+echo "===================================================="
+read -p "Enter your Zoho Email Address: " ZOHO_EMAIL
+read -s -p "Enter your Zoho App Password: " ZOHO_PASS
+
 
 cat << 'EOF' > .env
 PORT=3000
@@ -74,6 +82,12 @@ DB_PASSWORD=supersecurepassword
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=sidorea_db
+
+# SMTP Configuration for OTP (Zoho)
+SMTP_HOST=smtp.zoho.com
+SMTP_PORT=587
+SMTP_USER=$ZOHO_EMAIL
+SMTP_PASS=$ZOHO_PASS
 EOF
 
 npm install >/dev/null 2>&1
