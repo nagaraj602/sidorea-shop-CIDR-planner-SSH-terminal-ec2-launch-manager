@@ -149,6 +149,12 @@ fi
 # ---------------------------------------------------------
 # STAGE 2: Execute Nginx Configuration
 # ---------------------------------------------------------
+# Dynamically resolve the absolute path to the frontend folder
+FRONTEND_PATH="$(pwd)/frontend_public"
+
+# Ensure Nginx can read the directory structure up to this path
+sudo chmod -R 755 "$(pwd)"
+
 if [ "$SSL_CHOICE" == "1" ]; then
 
     read -p "Enter your email address (required for Let's Encrypt): " EMAIL
@@ -187,7 +193,7 @@ server {
     server_name $DOMAIN www.$DOMAIN;
 
     location / {
-        root /home/ubuntu/sidorea-shop-CIDR-planner-SSH-terminal-ec2-launch-manager/3-tier-architecture-with-postgres-db/frontend_public;
+        root $FRONTEND_PATH;
         index index.html;
         try_files \$uri \$uri.html \$uri/ =404;
     }
@@ -211,30 +217,31 @@ EOF
 
 else
     echo "🌐 Configuring Nginx for Local IP..."
-    sudo tee /etc/nginx/sites-available/sidorea > /dev/null << 'EOF'
+    # Removed quotes around EOF to allow injecting the dynamic FRONTEND_PATH
+    sudo tee /etc/nginx/sites-available/sidorea > /dev/null << EOF
 server {
     listen 80;
     server_name localhost;
 
     location / {
-        root /home/ubuntu/sidorea-shop-CIDR-planner-SSH-terminal-ec2-launch-manager/3-tier-architecture-with-postgres-db/frontend_public;
+        root $FRONTEND_PATH;
         index index.html;
-        try_files $uri $uri.html $uri/ =404;
+        try_files \$uri \$uri.html \$uri/ =404;
     }
 
     location /api/ {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
     }
 
     location /socket.io/ {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
+        proxy_set_header Host \$host;
     }
 }
 EOF
