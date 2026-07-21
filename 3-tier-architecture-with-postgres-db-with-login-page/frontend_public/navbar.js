@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <div style="display: flex; align-items: center;">
                 <span style="margin-right: 15px; font-weight:500; text-transform: capitalize;">User: ${user || 'Guest'}</span>
-                <button class="theme-toggle" onclick="openPasswordModal()">🔑 Profile</button>
+                <button class="theme-toggle" onclick="openPasswordModal()">🔑 Change Password</button>
                 <button class="theme-toggle" style="margin-left: 10px;" onclick="toggleGlobalTheme()">🌓 Theme</button>
                 <button class="theme-toggle logout-btn" onclick="logoutUser()">🚪 Logout</button>
             </div>
