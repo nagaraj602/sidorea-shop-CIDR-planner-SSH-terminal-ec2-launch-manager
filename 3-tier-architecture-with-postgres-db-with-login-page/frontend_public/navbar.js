@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const user = localStorage.getItem('cidr_user');
     const activePage = window.location.pathname;
 
-    // FIXED: Redirect unauthorized users back to the root login page
+    // Redirect unauthorized users back to the root login page
     if (!user && activePage !== '/' && !activePage.includes('/index')) {
         window.location.href = '/';
         return;
@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
     style.innerHTML = `
         :root { --bg: #f4f4f5; --card-bg: white; --text: #334155; --border: #cbd5e1; --primary: #2563eb; --primary-hover: #1d4ed8; }
         body.dark-mode { --bg: #0f172a; --card-bg: #1e293b; --text: #e2e8f0; --border: #475569; --primary: #3b82f6; --primary-hover: #2563eb; }
+        
         .nav-bar { display: flex; justify-content: space-between; border-bottom: 2px solid var(--border); padding-bottom: 15px; margin-bottom: 25px; align-items: center; font-family: system-ui; }
         .nav-left { display: flex; align-items: center; gap: 20px; }
         .logo-img { height: 40px; border-radius: 8px; object-fit: contain; }
@@ -43,7 +44,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const navHTML = `
         <div class="nav-bar">
             <div class="nav-left">
-                <img src="/logo.png" alt="Sidorea" class="logo-img">
+                <a href="/dashboard" title="Return to Dashboard">
+                    <img src="/logo.png" alt="Sidorea" class="logo-img" onerror="this.style.display='none'">
+                </a>
+                <div class="nav-links">
+                    <a href="/app" class="${activePage.includes('/app') ? 'active' : ''}">CIDR Calculator</a>
+                    <a href="/ssh" class="${activePage.includes('/ssh') ? 'active' : ''}">SSH Terminals</a>
+                    <a href="/vpc" class="${activePage.includes('/vpc') ? 'active' : ''}">AWS VPC Builder</a>
+                    <a href="/ec2" class="${activePage.includes('/ec2') ? 'active' : ''}">EC2 Types</a>
+                    <a href="/storage" class="${activePage.includes('/storage') ? 'active' : ''}">Storage Studio</a>
+                </div>
             </div>
             <div style="display: flex; align-items: center;">
                 <span style="margin-right: 15px; font-weight:500; text-transform: capitalize;">User: ${user || 'Guest'}</span>
@@ -73,18 +83,6 @@ window.logoutUser = function() {
     window.location.href = '/';
 };
 
-function applyStoredTheme() {
-    document.body.classList.toggle('dark-mode', localStorage.getItem('theme') === 'dark');
-}
-
-function toggleGlobalTheme() {
-    document.body.classList.toggle('dark-mode');
-    localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
-    window.dispatchEvent(new Event('storage')); 
-}
-window.addEventListener('storage', applyStoredTheme);
-
-
 window.openPasswordModal = function() { document.getElementById('pwd-modal').style.display = 'flex'; };
 window.closePasswordModal = function() { 
     document.getElementById('pwd-modal').style.display = 'none'; 
@@ -111,3 +109,14 @@ window.submitNewPassword = async function() {
         }
     } catch (err) { alert("Network error while updating password."); }
 };
+
+function applyStoredTheme() {
+    document.body.classList.toggle('dark-mode', localStorage.getItem('theme') === 'dark');
+}
+
+function toggleGlobalTheme() {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+    window.dispatchEvent(new Event('storage')); 
+}
+window.addEventListener('storage', applyStoredTheme);
