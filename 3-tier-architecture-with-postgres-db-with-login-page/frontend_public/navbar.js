@@ -48,6 +48,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     <img src="/logo.png" alt="Sidorea" class="logo-img" onerror="this.style.display='none'">
                 </a>
                 <div class="nav-links">
+                    <!-- Compact Home Icon added here -->
+                    <a href="/dashboard" title="Back to Dashboard" style="font-size: 18px; padding: 4px 10px;">🏠</a>
                     <a href="/app" class="${activePage.includes('/app') ? 'active' : ''}">CIDR Calculator</a>
                     <a href="/ssh" class="${activePage.includes('/ssh') ? 'active' : ''}">SSH Terminals</a>
                     <a href="/vpc" class="${activePage.includes('/vpc') ? 'active' : ''}">AWS VPC Builder</a>
@@ -57,10 +59,6 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
             <div style="display: flex; align-items: center;">
                 <span style="margin-right: 15px; font-weight:500; text-transform: capitalize;">User: ${user || 'Guest'}</span>
-                
-                <!-- Compact Back to Dashboard Button -->
-                <button class="theme-toggle" style="margin-right: 10px; font-size: 16px; padding: 4px 10px;" onclick="window.location.href='/dashboard'" title="Back to Dashboard">🏠</button>
-                
                 <button class="theme-toggle" onclick="openPasswordModal()">🔑 Profile</button>
                 <button class="theme-toggle" style="margin-left: 10px;" onclick="toggleGlobalTheme()">🌓 Theme</button>
                 <button class="theme-toggle logout-btn" onclick="logoutUser()">🚪 Logout</button>
