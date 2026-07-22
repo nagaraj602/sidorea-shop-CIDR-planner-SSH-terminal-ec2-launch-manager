@@ -90,32 +90,46 @@ app.post('/api/signup', async (req, res) => {
     }
 });
 
+// In-memory tracker for failed login attempts mapped by IP address
+const loginAttemptTracker = new Map();
+
 app.post('/api/login', async (req, res) => {
     const { identifier, password } = req.body;
+    
+    // Capture the real IP passed from Nginx, fallback to standard Express IP
+    const clientIp = req.headers['x-real-ip'] || req.ip;
+    
+    // Security measure: Prevent memory leaks under brute-force conditions
+    if (loginAttemptTracker.size > 500) loginAttemptTracker.clear();
+
+    const previousAttempts = loginAttemptTracker.get(clientIp) || 0;
+    const showSpecificError = previousAttempts === 0;
+
     try {
-        // 1. Check if the user exists first
         const result = await pool.query(`SELECT * FROM users WHERE username = $1 OR email = $1`, [identifier.toLowerCase()]);
         
-        // Trigger specific error if email/username is missing
         if (result.rows.length === 0) {
-            return res.status(404).send("This username or email address does not exist.");
+            // Record the failure and send conditional error message
+            loginAttemptTracker.set(clientIp, previousAttempts + 1);
+            return res.status(401).send(showSpecificError ? "This username or email address does not exist." : "Invalid credentials.");
         }
         
-        // 2. If user exists, verify the password
         const user = result.rows[0];
         const isValid = await bcrypt.compare(password, user.password_hash);
         
         if (isValid) {
+            // Reset the tracker upon a successful login
+            loginAttemptTracker.delete(clientIp);
             res.status(200).json({ username: user.username, email: user.email });
         } else {
-            // Trigger specific error for a bad password
-            res.status(401).send("Incorrect password. Please try again.");
+            // Record the failure and send conditional error message
+            loginAttemptTracker.set(clientIp, previousAttempts + 1);
+            res.status(401).send(showSpecificError ? "Incorrect password. Please try again." : "Invalid credentials.");
         }
     } catch (err) { 
         res.status(500).send(err.message); 
     }
 });
-
 app.post('/api/send-otp', async (req, res) => {
     const { email } = req.body;
     try {
