@@ -84,8 +84,8 @@ DB_PORT=5432
 DB_NAME=sidorea_db
 
 # SMTP Configuration for OTP (Zoho)
-SMTP_HOST=smtp.zoho.com
-SMTP_PORT=465
+SMTP_HOST=smtp.zoho.in
+SMTP_PORT=587
 SMTP_USER=$ZOHO_EMAIL
 SMTP_PASS=$ZOHO_PASS
 EOF
