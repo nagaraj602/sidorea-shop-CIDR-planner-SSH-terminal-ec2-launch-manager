@@ -93,13 +93,27 @@ app.post('/api/signup', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     const { identifier, password } = req.body;
     try {
+        // 1. Check if the user exists first
         const result = await pool.query(`SELECT * FROM users WHERE username = $1 OR email = $1`, [identifier.toLowerCase()]);
-        if (result.rows.length === 0) return res.status(401).send("Invalid credentials.");
+        
+        // Trigger specific error if email/username is missing
+        if (result.rows.length === 0) {
+            return res.status(404).send("This username or email address does not exist.");
+        }
+        
+        // 2. If user exists, verify the password
         const user = result.rows[0];
         const isValid = await bcrypt.compare(password, user.password_hash);
-        if (isValid) res.status(200).json({ username: user.username, email: user.email });
-        else res.status(401).send("Invalid credentials.");
-    } catch (err) { res.status(500).send(err.message); }
+        
+        if (isValid) {
+            res.status(200).json({ username: user.username, email: user.email });
+        } else {
+            // Trigger specific error for a bad password
+            res.status(401).send("Incorrect password. Please try again.");
+        }
+    } catch (err) { 
+        res.status(500).send(err.message); 
+    }
 });
 
 app.post('/api/send-otp', async (req, res) => {
