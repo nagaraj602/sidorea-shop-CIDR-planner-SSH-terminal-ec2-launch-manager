@@ -112,7 +112,7 @@ app.post('/api/send-otp', async (req, res) => {
         await pool.query(`UPDATE users SET otp = $1, otp_expiry = $2 WHERE email = $3`, [otp, expiry, email.toLowerCase()]);
         await transporter.sendMail({ from: process.env.SMTP_USER, to: email, subject: 'Sidorea Login OTP', text: `Your OTP is: ${otp}. It expires in 10 minutes.` });
         res.status(200).send("OTP sent.");
-    } catch (err) { res.status(500).send("Failed to send OTP."); }
+    } catch (err) { res.status(500).send(`Failed: ${err.message}`); }
 });
 
 app.post('/api/verify-otp', async (req, res) => {
