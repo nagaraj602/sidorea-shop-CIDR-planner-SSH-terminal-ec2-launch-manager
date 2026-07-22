@@ -75,7 +75,7 @@ read -p "Enter your Zoho Email Address: " ZOHO_EMAIL
 read -s -p "Enter your Zoho App Password: " ZOHO_PASS
 
 
-cat << 'EOF' > .env
+cat << EOF > .env
 PORT=3000
 DB_USER=sidorea_user
 DB_PASSWORD=supersecurepassword
