@@ -91,7 +91,7 @@ SMTP_PASS=$ZOHO_PASS
 EOF
 
 echo
-📥 Installing the Application...
+echo "📥 Installing the Application..."
 npm install >/dev/null 2>&1
 
 echo
