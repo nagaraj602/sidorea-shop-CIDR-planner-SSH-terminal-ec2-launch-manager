@@ -28,52 +28,29 @@ services:
 
   backend:
   build:
-    context: ./backend_api
-    dockerfile: Dockerfile
+    context: ../backend_api
 
-  container_name: sidorea-backend
-  restart: unless-stopped
+  env_file:
+    - .env
 
   depends_on:
     postgres:
       condition: service_healthy
 
-  environment:
-    NODE_ENV: production
-
-    # ==========================
-    # PostgreSQL Configuration
-    # ==========================
-    DB_HOST: postgres
-    DB_PORT: 5432
-    DB_NAME: sidorea
-    DB_USER: sidorea
-    DB_PASSWORD: sidorea123
-
-    # ==========================
-    # SMTP Configuration
-    # ==========================
-    SMTP_HOST: smtp.gmail.com
-    SMTP_PORT: 587
-    SMTP_SECURE: "false"
-    SMTP_USER: your-email@gmail.com
-    SMTP_PASS: your-app-password
-
-    # ==========================
-    # Application Configuration
-    # ==========================
-    JWT_SECRET: change-this-to-a-long-random-secret
-    BASE_URL: http://localhost
-
   ports:
     - "3000:3000"
+
+  restart: unless-stopped
 
   networks:
     - sidorea-network
 
+
+
+    
   frontend:
     build:
-      context: ./frontend_public
+      context: ../frontend_public
       dockerfile: Dockerfile
 
     container_name: sidorea-frontend
