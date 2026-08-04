@@ -27,7 +27,7 @@ This repository contains the **3-Tier Architecture** version of the application,
 - [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
 - [Docker Compose](#docker-compose)
 - [Kubernetes Deployment](#%EF%B8%8F-kubernetes-deployment)
-- [Security Notice](#-security-notice)
+- [Security Notice](#%EF%B8%8F-security-notice)
 
 ---
 <img width="2880" height="1616" alt="image" src="https://github.com/user-attachments/assets/b8125fd2-8bdf-4364-a072-775dac0ab607" />
