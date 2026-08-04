@@ -36,7 +36,7 @@ if ! command -v terraform >/dev/null; then
     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null 2>&1
     sudo apt-get update >/dev/null 2>&1
     sudo apt-get install -y terraform >/dev/null 2>&1
-    echo "Terraform Installed"
+    echo "Terraform Installed!"
 else
     echo "Terraform already installed."
 fi
