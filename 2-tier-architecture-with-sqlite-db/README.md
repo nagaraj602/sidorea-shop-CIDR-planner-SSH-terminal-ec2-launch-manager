@@ -14,14 +14,14 @@ This repository contains the **2-Tier Architecture** version of the application.
 ---
 # 📑 Table of Contents
 
-- [Architecture Overview](#-architecture-overview)
+- [Architecture Overview](#%EF%B8%8F-architecture-overview)
 - [Key Features](#-key-features)
 - [Prerequisites](#-prerequisites)
 - [Bare Metal Installation (PM2)](#-bare-metal-installation-pm2)
 - [Docker Deployment](#-docker-deployment)
 - [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
-- [Kubernetes Deployment](#-kubernetes-deployment)
-- [Security Notice](#-security-notice)
+- [Kubernetes Deployment](#%EF%B8%8F-kubernetes-deployment)
+- [Security Notice](#%EF%B8%8F-security-notice)
 
 ---
 <img width="2880" height="1702" alt="Screenshot 2026-07-19 201143" src="https://github.com/user-attachments/assets/ee712bc5-99ff-418f-ac33-c16caa8754ad" />
