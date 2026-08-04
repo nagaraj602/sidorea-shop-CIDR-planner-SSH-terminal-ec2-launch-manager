@@ -15,20 +15,6 @@ This repository contains the **3-Tier Architecture** version of the application,
 - Node.js API Backend
 - PostgreSQL Database
 
-
-<img width="2880" height="1616" alt="image" src="https://github.com/user-attachments/assets/b8125fd2-8bdf-4364-a072-775dac0ab607" />
-<img width="2880" height="1698" alt="Screenshot 2026-07-19 201226" src="https://github.com/user-attachments/assets/f562b73f-310f-4830-84ae-d7936f3c2128" />
-<img width="2880" height="1696" alt="Screenshot 2026-07-19 201920" src="https://github.com/user-attachments/assets/30743eb2-6906-4cf8-a2d9-30d184f8893a" />
-<img width="2880" height="1800" alt="Screenshot 2026-07-19 211324" src="https://github.com/user-attachments/assets/93506122-48df-4541-bb75-a77cbcec6a7c" />
-<img width="2880" height="1800" alt="Screenshot 2026-07-19 211347" src="https://github.com/user-attachments/assets/57d3e2de-9d0e-485e-8a04-8d4cbfee153b" />
-<img width="2880" height="1800" alt="Screenshot 2026-07-19 211356" src="https://github.com/user-attachments/assets/38d9c451-5707-4dd0-9e4f-d894dc3898b9" />
-
-
-
-
-
-
-
 ---
 
 # 📑 Table of Contents
@@ -44,7 +30,15 @@ This repository contains the **3-Tier Architecture** version of the application,
 - [Security Notice](#-security-notice)
 
 ---
+<img width="2880" height="1616" alt="image" src="https://github.com/user-attachments/assets/b8125fd2-8bdf-4364-a072-775dac0ab607" />
+<img width="2880" height="1698" alt="Screenshot 2026-07-19 201226" src="https://github.com/user-attachments/assets/f562b73f-310f-4830-84ae-d7936f3c2128" />
+<img width="2880" height="1696" alt="Screenshot 2026-07-19 201920" src="https://github.com/user-attachments/assets/30743eb2-6906-4cf8-a2d9-30d184f8893a" />
+<img width="2880" height="1800" alt="Screenshot 2026-07-19 211324" src="https://github.com/user-attachments/assets/93506122-48df-4541-bb75-a77cbcec6a7c" />
+<img width="2880" height="1800" alt="Screenshot 2026-07-19 211347" src="https://github.com/user-attachments/assets/57d3e2de-9d0e-485e-8a04-8d4cbfee153b" />
+<img width="2880" height="1800" alt="Screenshot 2026-07-19 211356" src="https://github.com/user-attachments/assets/38d9c451-5707-4dd0-9e4f-d894dc3898b9" />
 
+
+---
 # 🏗️ Architecture Overview
 
 The application follows a **3-tier architecture**, allowing independent scaling, better security, and easier maintenance.
