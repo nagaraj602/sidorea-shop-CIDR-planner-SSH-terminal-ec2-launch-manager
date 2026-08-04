@@ -28,12 +28,13 @@ sudo apt-get install -y nodejs npm curl wget gnupg software-properties-common ca
 ############################################
 # Install Terraform
 ############################################
-echo "🏗️ Installing Terraform..."
+echo "🏗️ Checking Terraform Installation..."
 if ! command -v terraform >/dev/null; then
     curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg >/dev/null 2>&1
     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null 2>&1
     sudo apt-get update  >/dev/null 2>&1
     sudo apt-get install -y terraform >/dev/null 2>&1
+    echo "Terraform Installed!"
 else
     echo "Terraform already installed."
 fi
