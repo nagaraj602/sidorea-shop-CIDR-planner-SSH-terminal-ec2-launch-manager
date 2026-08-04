@@ -19,7 +19,7 @@ This repository contains the **3-Tier Architecture** version of the application,
 
 # 📑 Table of Contents
 
-- [Architecture Overview](#-architecture-overview)
+- [Architecture Overview](#%EF%B8%8F-architecture-overview)
 - [Key Features](#-key-features)
 - [Prerequisites](#-prerequisites)
 - [Bare Metal Installation (PM2)](#-bare-metal-installation-pm2)
