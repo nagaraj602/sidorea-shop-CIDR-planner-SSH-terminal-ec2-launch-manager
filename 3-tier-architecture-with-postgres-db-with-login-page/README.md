@@ -38,6 +38,7 @@ This repository contains the **3-Tier Architecture** version of the application,
 - [Prerequisites](#-prerequisites)
 - [Bare Metal Installation (PM2)](#-bare-metal-installation-pm2)
 - [Docker Deployment](#-docker-deployment)
+- [Docker Compose](#-docker-compose)
 - [Enable HTTPS with Nginx & Certbot](#-enable-https-with-nginx--certbot)
 - [Kubernetes Deployment](#-kubernetes-deployment)
 - [Security Notice](#-security-notice)
@@ -327,7 +328,19 @@ Routing:
 > If using Kubernetes, ignore this script and instead configure **cert-manager** with an Ingress resource.
 
 ---
+# Docker Compose
+To bring the app using Docker compose, first you need to update the environment varibales in `backend_api/.env` file.
 
+Now you can run:
+```
+docker compose -f docker-compose.yml up
+```
+
+To bring it down:
+```
+docker compose -f docker-compose.yml down
+```
+---
 # ☸️ Kubernetes Deployment
 
 The repository includes a complete Kubernetes manifest.
