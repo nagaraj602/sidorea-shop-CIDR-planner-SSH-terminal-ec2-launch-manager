@@ -1,5 +1,7 @@
 #!/bin/bash
+set -e
 
+aws configure
 # This script is to install everything on your bare metal server and make the app up without using docker or Kubernetes. App backend uses port 3000 but nginx will reverse proxy it and app runs on port 80 (HTTP) or 443 (HTTPS)
 
 # Detect Linux Distribution
